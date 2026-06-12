@@ -34,7 +34,6 @@ public class FanPopup : Form
 
     // パネル配色(SF調ダーク + シアンのアクセント)
     private static readonly Color PanelFill = Color.FromArgb(13, 18, 28);
-    private static readonly Color PanelBorder = Color.FromArgb(110, 190, 255);
     private static readonly Color HoverFill = Color.FromArgb(120, 200, 255);
 
     private sealed class Row
@@ -251,13 +250,6 @@ public class FanPopup : Form
         g.FillPath(brush, path);
         g.DrawPath(pen, path);
 
-        // 対角コーナーの短いブラケットだけでSF感を出す(左上・右下)
-        var len = 16 * _scale;
-        using var accentPen = new Pen(Color.FromArgb(a * 190 / 255, PanelBorder), 1.6f);
-        g.DrawLine(accentPen, rect.X + radius, rect.Y, rect.X + radius + len, rect.Y);
-        g.DrawLine(accentPen, rect.X, rect.Y + radius, rect.X, rect.Y + radius + len);
-        g.DrawLine(accentPen, rect.Right - radius - len, rect.Bottom, rect.Right - radius, rect.Bottom);
-        g.DrawLine(accentPen, rect.Right, rect.Bottom - radius - len, rect.Right, rect.Bottom - radius);
     }
 
     private void DrawRow(Graphics g, RectangleF rect, Row row, bool hover, float alpha)
@@ -273,7 +265,7 @@ public class FanPopup : Form
 
         var rowFill = hover ? AdjustBrightness(row.FillColor, 0.16f) : row.FillColor;
         using (var rowPath = Draw.RoundedRect(rect.X + 3 * _scale, rect.Y + 2 * _scale,
-                   rect.Width - 6 * _scale, rect.Height - 4 * _scale, (rect.Height - 4 * _scale) / 2))
+                   rect.Width - 6 * _scale, rect.Height - 4 * _scale, 4 * _scale))
         using (var rowBrush = new SolidBrush(Color.FromArgb(a * 245 / 255, rowFill)))
         using (var rowPen = new Pen(Color.FromArgb(a * 72 / 255, row.TextColor), 1f))
         {

@@ -74,31 +74,36 @@ public static class Launcher
 
     private static string GetDefaultWslDistro()
     {
-        // 既定ディストリ名はセッション中変わらない前提でプロセス内にキャッシュする
-        // (WSL のコールドスタートを毎回の起動で繰り返さないため)。
+        // 既定ディストリ名はセッション中変わらない前提でプロセス内にキャッシュする。
         if (_cachedDefaultDistro != null) return _cachedDefaultDistro;
 
+        // wsl --list --quiet はデフォルトディストリを先頭に列挙する。
+        // 出力は UTF-16LE なので StandardOutputEncoding を明示する。
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
         {
             FileName = "wsl",
-            Arguments = "-e sh -lc \"printf %s \\\"$WSL_DISTRO_NAME\\\"\"",
+            Arguments = "--list --quiet",
             UseShellExecute = false,
             RedirectStandardOutput = true,
+            StandardOutputEncoding = System.Text.Encoding.Unicode,
             CreateNoWindow = true,
         };
         process.Start();
 
-        // 先に終了を待つことでタイムアウトを実効化する($WSL_DISTRO_NAME は短いので
-        // パイプが詰まる心配はなく、終了後の ReadToEnd はブロックしない)。
-        if (!process.WaitForExit(3000))
+        if (!process.WaitForExit(5000))
         {
             try { process.Kill(); } catch { /* 既に終了している場合は無視 */ }
             throw new InvalidOperationException("WSL の既定ディストリビューション名の取得がタイムアウトしました。");
         }
 
-        var distro = process.StandardOutput.ReadToEnd().Trim();
-        if (process.ExitCode != 0 || distro.Length == 0)
+        var output = process.StandardOutput.ReadToEnd();
+        var distro = output
+            .Split(new[] { '\r', '\n', '\0' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .FirstOrDefault(s => s.Length > 0);
+
+        if (process.ExitCode != 0 || distro == null)
             throw new InvalidOperationException("WSL の既定ディストリビューション名を取得できませんでした。");
 
         _cachedDefaultDistro = distro;
