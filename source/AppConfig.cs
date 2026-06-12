@@ -14,49 +14,6 @@ public class PathEntry
 
     public override string ToString() => $"{DisplayName}  ({Path})";
 
-    public static string NormalizeChipTheme(string value)
-    {
-        return value.ToUpperInvariant() switch
-        {
-            "DARK" or "DARK1" or "DARKBLACK" => "DarkBlack",
-            "DARK2" => "DarkBlue",
-            "DARK3" => "DarkRed",
-            "DARK4" => "DarkGreen",
-            "DARKBLUE" => "DarkBlue",
-            "DARKRED" => "DarkRed",
-            "DARKGREEN" => "DarkGreen",
-            "LIGHT" or "LIGHT1" or "LIGHTWHITE" => "LightWhite",
-            "LIGHT2" => "LightBlue",
-            "LIGHT3" => "LightRed",
-            "LIGHT4" => "LightGreen",
-            "LIGHTBLUE" => "LightBlue",
-            "LIGHTRED" => "LightRed",
-            "LIGHTGREEN" => "LightGreen",
-            _ => "DarkBlack",
-        };
-    }
-
-    public static Color GetChipColor(string theme)
-    {
-        return NormalizeChipTheme(theme) switch
-        {
-            "DarkBlack" => Color.FromArgb(40, 44, 60),
-            "DarkBlue" => Color.FromArgb(34, 59, 96),
-            "DarkRed" => Color.FromArgb(93, 42, 50),
-            "DarkGreen" => Color.FromArgb(43, 78, 58),
-            "LightWhite" => Color.FromArgb(244, 246, 250),
-            "LightBlue" => Color.FromArgb(218, 232, 252),
-            "LightRed" => Color.FromArgb(252, 224, 226),
-            "LightGreen" => Color.FromArgb(221, 241, 226),
-            _ => Color.FromArgb(40, 44, 60),
-        };
-    }
-
-    public static Color GetFontColorForBackground(Color background)
-    {
-        return background.GetBrightness() > 0.62f ? Color.Black : Color.White;
-    }
-
     /// <summary>パスから表示名を機械的に生成する。例: "WSL : github - hoge", "C : github - huga"</summary>
     public static string GenerateName(string path, bool isWsl)
     {

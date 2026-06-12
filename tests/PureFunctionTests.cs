@@ -52,16 +52,16 @@ internal static class Program
 
     private static void NormalizeChipTheme_Cases()
     {
-        Section(nameof(PathEntry.NormalizeChipTheme));
-        Eq("DarkBlack", PathEntry.NormalizeChipTheme("DARK1"));
-        Eq("DarkBlack", PathEntry.NormalizeChipTheme("DARK"));
-        Eq("DarkBlue", PathEntry.NormalizeChipTheme("DARK2"));
-        Eq("DarkRed", PathEntry.NormalizeChipTheme("DARK3"));
-        Eq("DarkGreen", PathEntry.NormalizeChipTheme("DARK4"));
-        Eq("LightWhite", PathEntry.NormalizeChipTheme("LIGHT"));
-        Eq("LightBlue", PathEntry.NormalizeChipTheme("LIGHT2"));
-        Eq("DarkBlue", PathEntry.NormalizeChipTheme("darkblue"));              // 小文字も通る
-        Eq("DarkBlack", PathEntry.NormalizeChipTheme("unknown-value"));        // 不明値はデフォルト
+        Section(nameof(ChipThemes.NormalizeChipTheme));
+        Eq("DarkBlack", ChipThemes.NormalizeChipTheme("DARK1"));
+        Eq("DarkBlack", ChipThemes.NormalizeChipTheme("DARK"));
+        Eq("DarkBlue", ChipThemes.NormalizeChipTheme("DARK2"));
+        Eq("DarkRed", ChipThemes.NormalizeChipTheme("DARK3"));
+        Eq("DarkGreen", ChipThemes.NormalizeChipTheme("DARK4"));
+        Eq("LightWhite", ChipThemes.NormalizeChipTheme("LIGHT"));
+        Eq("LightBlue", ChipThemes.NormalizeChipTheme("LIGHT2"));
+        Eq("DarkBlue", ChipThemes.NormalizeChipTheme("darkblue"));              // 小文字も通る
+        Eq("DarkBlack", ChipThemes.NormalizeChipTheme("unknown-value"));        // 不明値はデフォルト
     }
 
     private static void QuoteCmdArgument_Cases()

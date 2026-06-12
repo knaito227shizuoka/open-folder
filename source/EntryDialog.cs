@@ -70,7 +70,7 @@ public class EntryDialog : Form
 
     private void AddThemeButton(Control parent, string theme, string text, int x, int y)
     {
-        var color = PathEntry.GetChipColor(theme);
+        var color = ChipThemes.GetChipColor(theme);
         var swatch = new Panel
         {
             BackColor = color,
@@ -89,7 +89,7 @@ public class EntryDialog : Form
 
     private void ApplyStyleSelection()
     {
-        var theme = PathEntry.NormalizeChipTheme(Entry.ChipTheme);
+        var theme = ChipThemes.NormalizeChipTheme(Entry.ChipTheme);
         foreach (var button in _themeButtons)
             button.Checked = string.Equals((string?)button.Tag, theme, StringComparison.Ordinal);
     }

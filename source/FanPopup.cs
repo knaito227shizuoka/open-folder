@@ -122,14 +122,14 @@ public class FanPopup : Form
             _rowH = 30 * _scale;
             foreach (var (text, chipTheme, action, rightAction) in items)
             {
-                var fillColor = PathEntry.GetChipColor(chipTheme);
+                var fillColor = ChipThemes.GetChipColor(chipTheme);
                 _rows.Add(new Row
                 {
                     Text = text,
                     Action = action,
                     RightAction = rightAction,
                     FillColor = fillColor,
-                    TextColor = PathEntry.GetFontColorForBackground(fillColor),
+                    TextColor = ChipThemes.GetFontColorForBackground(fillColor),
                     TextWidth = g.MeasureString(text, Font).Width,
                 });
             }
