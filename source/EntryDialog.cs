@@ -129,14 +129,17 @@ public class EntryDialog : Form
             return false;
         }
 
-        if (Launcher.TryConvertUncWslPath(path, out var wslPath))
+        string? wslDistro = null;
+        if (Launcher.TryConvertUncWslPath(path, out var wslPath, out var detectedDistro))
         {
             path = wslPath;
+            wslDistro = detectedDistro;
             _wslCheck.Checked = true;
         }
 
         Entry.Path = path;
         Entry.IsWsl = _wslCheck.Checked;
+        Entry.WslDistro = Entry.IsWsl ? wslDistro ?? Entry.WslDistro : null;
         Entry.Name = PathEntry.GenerateName(path, Entry.IsWsl);
         Entry.ChipTheme = _themeButtons.FirstOrDefault(b => b.Checked)?.Tag as string ?? "DarkBlack";
         return true;

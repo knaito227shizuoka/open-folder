@@ -7,6 +7,7 @@ public class PathEntry
     public string Name { get; set; } = "";
     public string Path { get; set; } = "";
     public bool IsWsl { get; set; }
+    public string? WslDistro { get; set; }
     public string ChipTheme { get; set; } = "DarkBlack";
 
     public string DisplayName => Name;
