@@ -6,6 +6,7 @@ public class EntryDialog : Form
     private readonly TextBox _pathBox = new();
     private readonly CheckBox _wslCheck = new();
     private readonly Label _namePreview = new();
+    private readonly List<RadioButton> _themeButtons = new();
 
     public PathEntry Entry { get; }
 
@@ -17,16 +18,16 @@ public class EntryDialog : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 150);
+        StartPosition = FormStartPosition.CenterParent;
+        ClientSize = new Size(460, 260);
         Font = new Font("Yu Gothic UI", 9f);
 
         var pathLabel = new Label { Text = "パス", Location = new Point(12, 15), AutoSize = true };
-        _pathBox.SetBounds(70, 12, 296, 23);
+        _pathBox.SetBounds(70, 12, 336, 23);
         _pathBox.Text = Entry.Path;
         _pathBox.TextChanged += (_, _) => UpdatePreview();
 
-        var browseButton = new Button { Text = "...", Bounds = new Rectangle(372, 11, 34, 25) };
+        var browseButton = new Button { Text = "...", Bounds = new Rectangle(412, 11, 34, 25) };
         browseButton.Click += (_, _) => Browse();
 
         _wslCheck.Text = "WSL内のパス (例: /home/user/project)";
@@ -36,17 +37,61 @@ public class EntryDialog : Form
         _wslCheck.CheckedChanged += (_, _) => UpdatePreview();
 
         var nameLabel = new Label { Text = "名前", Location = new Point(12, 75), AutoSize = true };
-        _namePreview.SetBounds(70, 75, 336, 23);
+        _namePreview.SetBounds(70, 75, 376, 23);
         _namePreview.ForeColor = SystemColors.GrayText;
 
-        var okButton = new Button { Text = "OK", DialogResult = DialogResult.OK, Bounds = new Rectangle(240, 110, 80, 28) };
-        var cancelButton = new Button { Text = "キャンセル", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(326, 110, 80, 28) };
-        okButton.Click += (_, e) => { if (!Commit()) DialogResult = DialogResult.None; };
+        var themeGroup = new GroupBox { Text = "背景色", Bounds = new Rectangle(70, 104, 376, 92) };
+        AddThemeButton(themeGroup, "DarkBlack", "黒", 12, 24);
+        AddThemeButton(themeGroup, "DarkBlue", "青", 102, 24);
+        AddThemeButton(themeGroup, "DarkRed", "赤", 192, 24);
+        AddThemeButton(themeGroup, "DarkGreen", "緑", 282, 24);
+        AddThemeButton(themeGroup, "LightWhite", "白", 12, 58);
+        AddThemeButton(themeGroup, "LightBlue", "青", 102, 58);
+        AddThemeButton(themeGroup, "LightRed", "赤", 192, 58);
+        AddThemeButton(themeGroup, "LightGreen", "緑", 282, 58);
+        ApplyStyleSelection();
+
+        var okButton = new Button { Text = "OK", DialogResult = DialogResult.OK, Bounds = new Rectangle(280, 220, 80, 28) };
+        var cancelButton = new Button { Text = "キャンセル", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(366, 220, 80, 28) };
+        okButton.Click += (_, _) =>
+        {
+            if (!Commit()) DialogResult = DialogResult.None;
+        };
 
         AcceptButton = okButton;
         CancelButton = cancelButton;
-        Controls.AddRange(new Control[] { pathLabel, _pathBox, browseButton, _wslCheck, nameLabel, _namePreview, okButton, cancelButton });
+        Controls.AddRange(new Control[]
+        {
+            pathLabel, _pathBox, browseButton, _wslCheck, nameLabel, _namePreview,
+            themeGroup, okButton, cancelButton,
+        });
         UpdatePreview();
+    }
+
+    private void AddThemeButton(Control parent, string theme, string text, int x, int y)
+    {
+        var color = PathEntry.GetChipColor(theme);
+        var swatch = new Panel
+        {
+            BackColor = color,
+            BorderStyle = BorderStyle.FixedSingle,
+            Bounds = new Rectangle(x, y + 3, 16, 16),
+        };
+        var button = new RadioButton
+        {
+            Text = text,
+            Tag = theme,
+            Bounds = new Rectangle(x + 20, y, 56, 22),
+        };
+        _themeButtons.Add(button);
+        parent.Controls.AddRange(new Control[] { swatch, button });
+    }
+
+    private void ApplyStyleSelection()
+    {
+        var theme = PathEntry.NormalizeChipTheme(Entry.ChipTheme);
+        foreach (var button in _themeButtons)
+            button.Checked = string.Equals((string?)button.Tag, theme, StringComparison.Ordinal);
     }
 
     /// <summary>WSL自動判定と名前プレビューの更新。</summary>
@@ -84,7 +129,6 @@ public class EntryDialog : Form
             return false;
         }
 
-        // \\wsl.localhost\... 形式は WSL パスに変換する
         if (Launcher.TryConvertUncWslPath(path, out var wslPath))
         {
             path = wslPath;
@@ -94,6 +138,7 @@ public class EntryDialog : Form
         Entry.Path = path;
         Entry.IsWsl = _wslCheck.Checked;
         Entry.Name = PathEntry.GenerateName(path, Entry.IsWsl);
+        Entry.ChipTheme = _themeButtons.FirstOrDefault(b => b.Checked)?.Tag as string ?? "DarkBlack";
         return true;
     }
 }

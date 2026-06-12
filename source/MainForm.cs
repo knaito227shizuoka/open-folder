@@ -197,17 +197,17 @@ public class MainForm : Form
     {
         if (_popup.Visible && !_popup.IsFadingOut) return;
 
-        var items = new List<(string, Action)>();
+        var items = new List<(string Text, string ChipTheme, Action Action, Action? RightAction)>();
         if (_config.Entries.Count == 0)
         {
-            items.Add(("パスを追加...", AddEntry));
+            items.Add(("パスを追加...", "DarkBlack", ManageEntries, ManageEntries));
         }
         else
         {
             foreach (var entry in _config.Entries)
             {
                 var captured = entry;
-                items.Add((entry.Name, () => OpenEntry(captured)));
+                items.Add((entry.DisplayName, entry.ChipTheme, () => OpenEntry(captured), () => EditEntry(captured)));
             }
         }
 
@@ -224,9 +224,13 @@ public class MainForm : Form
             _hoverWatch.Stop();
             return;
         }
-        var safe = Rectangle.Union(Bounds, _popup.Bounds);
-        safe.Inflate(14, 14);
-        if (!safe.Contains(Cursor.Position))
+        var chipSafe = _popup.ChipAreaScreenBounds;
+        chipSafe.Inflate(10, 10);
+        var iconSafe = Bounds;
+        iconSafe.Inflate(10, 10);
+
+        var cursor = Cursor.Position;
+        if (!chipSafe.Contains(cursor) && !iconSafe.Contains(cursor))
         {
             _hoverWatch.Stop();
             _popup.FadeOut();
@@ -238,7 +242,6 @@ public class MainForm : Form
     private ContextMenuStrip BuildSettingsMenu()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("パスを追加...", null, (_, _) => AddEntry());
         menu.Items.Add("パスの管理...", null, (_, _) => ManageEntries());
         menu.Items.Add(new ToolStripSeparator());
 
@@ -267,18 +270,18 @@ public class MainForm : Form
 
     // ---- 操作 ----
 
-    private void AddEntry()
-    {
-        using var dialog = new EntryDialog();
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        _config.Entries.Add(dialog.Entry);
-        _config.Save();
-    }
-
     private void ManageEntries()
     {
         using var dialog = new ManageDialog(_config.Entries);
         dialog.ShowDialog(this);
+        _config.Save();
+    }
+
+    private void EditEntry(PathEntry entry)
+    {
+        using var dialog = new EntryDialog(entry);
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        _config.Entries.Sort(PathEntry.ByName);
         _config.Save();
     }
 

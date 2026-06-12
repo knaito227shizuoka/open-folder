@@ -20,53 +20,68 @@ internal static class Draw
 }
 
 /// <summary>
-/// マウスオーバーでアイコンの左上に扇型に展開するパス一覧。
-/// per-pixelアルファの1枚のレイヤードウィンドウに全チップを描画する方式で、
+/// マウスオーバーでアイコンの下に表示するパス一覧パネル。
+/// ダークな1枚パネルの中に行を縦に並べ、各行の左端にテーマ色のアクセントバーを置く。
+/// per-pixelアルファの1枚のレイヤードウィンドウに全体を描画する方式で、
 /// 透明部分は自動でクリックスルーになる。フォーカスは奪わない。
 /// </summary>
 public class FanPopup : Form
 {
-    private const int ChipAnimMs = 180;   // 1チップの展開時間
-    private const int StaggerMs = 25;     // チップごとの時差
+    private const int PanelAnimMs = 130;  // パネルのスライドイン時間
+    private const int RowAnimMs = 110;    // 1行のフェードイン時間
+    private const int StaggerMs = 22;     // 行ごとの時差
     private const int FadeOutMs = 90;
-    private const float ArcCenterDeg = 180f; // 扇の中心方向(90=真上, 180=真左)
-    private const float MaxArcDeg = 80f;
-    private const float StepDeg = 16f;
 
-    private sealed class Chip
+    // パネル配色(SF調ダーク + シアンのアクセント)
+    private static readonly Color PanelFill = Color.FromArgb(13, 18, 28);
+    private static readonly Color PanelBorder = Color.FromArgb(110, 190, 255);
+    private static readonly Color HoverFill = Color.FromArgb(120, 200, 255);
+
+    private sealed class Row
     {
         public string Text = "";
         public Action Action = () => { };
-        public float Width;
-        public PointF Dir;          // 展開方向の単位ベクトル
-        public float FinalRight;
+        public Action? RightAction;
+        public Color FillColor;
+        public Color TextColor;
+        public float TextWidth;
         public RectangleF FinalRect;
     }
 
     private readonly System.Windows.Forms.Timer _anim = new() { Interval = 15 };
-    private readonly List<Chip> _chips = new();
+    private readonly List<Row> _rows = new();
     private Bitmap? _frame;
     private float _scale = 1f;
-    private float _chipH;
-    private float _radius;
-    private PointF _origin;        // アイコン中心(ウィンドウ座標)
+    private float _rowH;
+    private RectangleF _panel;     // パネル最終位置(ウィンドウ座標)
     private int _hover = -1;
     private long _t0;
     private bool _fadingOut;
 
     public bool IsFadingOut => _fadingOut;
 
+    public Rectangle ChipAreaScreenBounds
+    {
+        get
+        {
+            if (_rows.Count == 0) return Bounds;
+            var bounds = Rectangle.Ceiling(_panel);
+            bounds.Offset(Left, Top);
+            return bounds;
+        }
+    }
+
     public FanPopup()
     {
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
-        Font = new Font("Yu Gothic UI", 10f);
+        Font = new Font("Yu Gothic UI", 10.8f);
 
         _anim.Tick += (_, _) => Animate();
         MouseMove += (_, e) => SetHover(HitTest(e.Location));
         MouseLeave += (_, _) => SetHover(-1);
-        MouseUp += OnChipMouseUp;
+        MouseUp += OnRowMouseUp;
     }
 
     protected override bool ShowWithoutActivation => true;
@@ -83,69 +98,59 @@ public class FanPopup : Form
         }
     }
 
-    /// <summary>アンカー(ウィジェット)の左上に扇型に展開して表示する。</summary>
-    public void ShowAt(List<(string Text, Action Action)> items, Rectangle anchor)
+    /// <summary>アンカー(ウィジェット)の下にパネルを表示する。右端はアンカー右端に揃える。</summary>
+    public void ShowAt(List<(string Text, string ChipTheme, Action Action, Action? RightAction)> items, Rectangle anchor)
     {
         _anim.Stop();
         _fadingOut = false;
         _hover = -1;
-        _chips.Clear();
+        _rows.Clear();
 
         using (var g = CreateGraphics())
         {
             _scale = g.DpiX / 96f;
-            _chipH = 32 * _scale;
-            foreach (var (text, action) in items)
+            _rowH = 30 * _scale;
+            foreach (var (text, chipTheme, action, rightAction) in items)
             {
-                var w = g.MeasureString(text, Font).Width + 26 * _scale;
-                _chips.Add(new Chip { Text = text, Action = action, Width = w });
+                var fillColor = PathEntry.GetChipColor(chipTheme);
+                _rows.Add(new Row
+                {
+                    Text = text,
+                    Action = action,
+                    RightAction = rightAction,
+                    FillColor = fillColor,
+                    TextColor = PathEntry.GetFontColorForBackground(fillColor),
+                    TextWidth = g.MeasureString(text, Font).Width,
+                });
             }
         }
 
-        // 弧の角度割りと、チップ同士が重ならない半径を決める
-        var n = _chips.Count;
-        var stepDeg = n > 1 ? Math.Min(StepDeg, MaxArcDeg / (n - 1)) : 0f;
-        var stepRad = stepDeg * MathF.PI / 180f;
-        var minRadius = n > 1 ? (_chipH + 2 * _scale) / stepRad : 0f;
-        _radius = Math.Max(120 * _scale, minRadius);
+        var n = _rows.Count;
+        var pad = 6f * _scale;                    // パネル内側余白
+        var rowGap = 2f * _scale;
+        var textLeft = 10f * _scale + 3f * _scale + 9f * _scale; // 行左端→バー→テキスト
+        var maxTextW = _rows.Max(r => r.TextWidth);
+        var rowW = Math.Max(120 * _scale, textLeft + maxTextW + 14 * _scale);
 
-        var anchorCenter = new PointF(anchor.Left + anchor.Width / 2f, anchor.Top + anchor.Height / 2f);
-        var startDeg = ArcCenterDeg - stepDeg * (n - 1) / 2f;
+        var panelW = rowW + pad * 2;
+        var panelH = n * _rowH + Math.Max(0, n - 1) * rowGap + pad * 2;
+        var panelRight = (float)anchor.Right;
+        var panelTop = anchor.Bottom + 8 * _scale;
+        var panelScreen = new RectangleF(panelRight - panelW, panelTop, panelW, panelH);
 
-        var tips = new PointF[n];
-        var alignedRight = anchor.Left - 8 * _scale;
-        for (var i = 0; i < n; i++)
-        {
-            var rad = (startDeg + stepDeg * i) * MathF.PI / 180f;
-            var chip = _chips[i];
-            chip.Dir = new PointF(MathF.Cos(rad), -MathF.Sin(rad));
-            tips[i] = new PointF(anchorCenter.X + chip.Dir.X * _radius, anchorCenter.Y + chip.Dir.Y * _radius);
-        }
-
-        // 各チップの最終位置(スクリーン座標)から必要なウィンドウ範囲を求める。
-        // 左に開く一覧なので、幅が違ってもアイコン近くの右端ラインに揃える。
-        var union = new RectangleF(anchorCenter.X - 4, anchorCenter.Y - 4, 8, 8);
-        for (var i = 0; i < n; i++)
-        {
-            var chip = _chips[i];
-            chip.FinalRight = alignedRight;
-            chip.FinalRect = new RectangleF(alignedRight - chip.Width, tips[i].Y - _chipH / 2, chip.Width, _chipH);
-            union = RectangleF.Union(union, chip.FinalRect);
-        }
+        // スライドイン余白ぶんを含めてウィンドウ範囲を決める
+        var union = panelScreen;
         union.Inflate(12 * _scale, 12 * _scale);
-
         var bounds = Rectangle.Ceiling(union);
         MinimumSize = MaximumSize = bounds.Size;
         Bounds = bounds;
 
         // スクリーン座標 → ウィンドウ座標へ変換
-        _origin = new PointF(anchorCenter.X - bounds.X, anchorCenter.Y - bounds.Y);
-        foreach (var chip in _chips)
+        _panel = new RectangleF(panelScreen.X - bounds.X, panelScreen.Y - bounds.Y, panelW, panelH);
+        for (var i = 0; i < n; i++)
         {
-            chip.FinalRight -= bounds.X;
-            chip.FinalRect = new RectangleF(
-                chip.FinalRect.X - bounds.X, chip.FinalRect.Y - bounds.Y,
-                chip.FinalRect.Width, chip.FinalRect.Height);
+            _rows[i].FinalRect = new RectangleF(
+                _panel.X + pad, _panel.Y + pad + i * (_rowH + rowGap), rowW, _rowH);
         }
 
         _frame?.Dispose();
@@ -170,6 +175,7 @@ public class FanPopup : Form
     {
         _anim.Stop();
         _fadingOut = false;
+        Cursor = Cursors.Default;
         Hide();
     }
 
@@ -190,63 +196,116 @@ public class FanPopup : Form
         }
     }
 
-    /// <summary>各チップを時差付きイージングで描画する。全チップ完了で true。</summary>
+    private static float EaseOutCubic(float t) => 1f - MathF.Pow(1f - t, 3f);
+
+    /// <summary>パネルをスライドイン、行を時差付きフェードインで描画する。全アニメ完了で true。</summary>
     private bool RenderFrame(long elapsed)
     {
         if (_frame == null) return true;
-        var done = true;
         using var g = Graphics.FromImage(_frame);
         g.Clear(Color.Transparent);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
-        for (var i = 0; i < _chips.Count; i++)
+        var panelT = Math.Clamp(elapsed / (float)PanelAnimMs, 0f, 1f);
+        var panelEase = EaseOutCubic(panelT);
+        var dy = -(1f - panelEase) * 8 * _scale; // アンカー側から滑り出す
+
+        var panel = _panel;
+        panel.Offset(0, dy);
+        DrawPanel(g, panel, panelEase);
+
+        var done = panelT >= 1f;
+        for (var i = 0; i < _rows.Count; i++)
         {
-            var chip = _chips[i];
-            var t = Math.Clamp((elapsed - (long)i * StaggerMs) / (float)ChipAnimMs, 0f, 1f);
+            var row = _rows[i];
+            var t = Math.Clamp((elapsed - (long)i * StaggerMs) / (float)RowAnimMs, 0f, 1f);
             if (t < 1f) done = false;
             if (t <= 0f) continue;
 
-            // ease-out back(軽いオーバーシュートで弾む感じに)
-            const float c1 = 0.8f, c3 = c1 + 1f;
-            var ease = 1f + c3 * MathF.Pow(t - 1f, 3f) + c1 * MathF.Pow(t - 1f, 2f);
-            var alpha = Math.Clamp(t * 1.6f, 0f, 1f); // 透明度は先行して上げる
-
-            var right = _origin.X + (chip.FinalRight - _origin.X) * ease;
-            var centerY = _origin.Y + chip.Dir.Y * _radius * ease;
-            var rect = new RectangleF(right - chip.Width, centerY - _chipH / 2, chip.Width, _chipH);
-
-            DrawChip(g, rect, chip.Text, i == _hover, alpha);
+            var ease = EaseOutCubic(t);
+            var rect = row.FinalRect;
+            rect.Offset(-(1f - ease) * 8 * _scale, dy);
+            DrawRow(g, rect, row, i == _hover, ease * panelEase);
         }
         return done;
     }
 
-    private void DrawChip(Graphics g, RectangleF rect, string text, bool hover, float alpha)
+    private void DrawPanel(Graphics g, RectangleF rect, float alpha)
     {
-        var fill = hover ? Color.FromArgb(72, 104, 176) : Color.FromArgb(40, 44, 60);
         var a = (int)(alpha * 255);
-        using var path = Draw.RoundedRect(rect.X, rect.Y, rect.Width, rect.Height, rect.Height / 2);
-        using var brush = new SolidBrush(Color.FromArgb(a * 242 / 255, fill));
-        using var pen = new Pen(Color.FromArgb(a * 70 / 255, 255, 255, 255), 1f);
+        var radius = 10 * _scale;
+        using var path = Draw.RoundedRect(rect.X, rect.Y, rect.Width, rect.Height, radius);
+        using var brush = new SolidBrush(Color.FromArgb(a * 235 / 255, PanelFill));
+        using var pen = new Pen(Color.FromArgb(a * 100 / 255, PanelBorder), 1f);
         g.FillPath(brush, path);
         g.DrawPath(pen, path);
 
-        var textColor = hover ? Color.White : Color.Gainsboro;
-        using var textBrush = new SolidBrush(Color.FromArgb(a, textColor));
+        // 対角コーナーの短いブラケットだけでSF感を出す(左上・右下)
+        var len = 16 * _scale;
+        using var accentPen = new Pen(Color.FromArgb(a * 190 / 255, PanelBorder), 1.6f);
+        g.DrawLine(accentPen, rect.X + radius, rect.Y, rect.X + radius + len, rect.Y);
+        g.DrawLine(accentPen, rect.X, rect.Y + radius, rect.X, rect.Y + radius + len);
+        g.DrawLine(accentPen, rect.Right - radius - len, rect.Bottom, rect.Right - radius, rect.Bottom);
+        g.DrawLine(accentPen, rect.Right, rect.Bottom - radius - len, rect.Right, rect.Bottom - radius);
+    }
+
+    private void DrawRow(Graphics g, RectangleF rect, Row row, bool hover, float alpha)
+    {
+        var a = (int)(alpha * 255);
+
+        if (hover)
+        {
+            using var hoverPath = Draw.RoundedRect(rect.X, rect.Y, rect.Width, rect.Height, 6 * _scale);
+            using var hoverBrush = new SolidBrush(Color.FromArgb(a * 34 / 255, HoverFill));
+            g.FillPath(hoverBrush, hoverPath);
+        }
+
+        var rowFill = hover ? AdjustBrightness(row.FillColor, 0.16f) : row.FillColor;
+        using (var rowPath = Draw.RoundedRect(rect.X + 3 * _scale, rect.Y + 2 * _scale,
+                   rect.Width - 6 * _scale, rect.Height - 4 * _scale, (rect.Height - 4 * _scale) / 2))
+        using (var rowBrush = new SolidBrush(Color.FromArgb(a * 245 / 255, rowFill)))
+        using (var rowPen = new Pen(Color.FromArgb(a * 72 / 255, row.TextColor), 1f))
+        {
+            g.FillPath(rowBrush, rowPath);
+            g.DrawPath(rowPen, rowPath);
+        }
+
+        // 左端のテーマ色アクセントバー
+        var barW = 3f * _scale;
+        var barH = rect.Height - 12 * _scale;
+        var barX = rect.X + 10 * _scale;
+        var bar = hover ? AdjustBrightness(row.TextColor, 0.25f) : row.TextColor;
+        using (var barPath = Draw.RoundedRect(barX, rect.Y + (rect.Height - barH) / 2, barW, barH, barW / 2))
+        using (var barBrush = new SolidBrush(Color.FromArgb(a, bar)))
+            g.FillPath(barBrush, barPath);
+
+        using var textBrush = new SolidBrush(Color.FromArgb(a, row.TextColor));
         using var format = new StringFormat
         {
+            Alignment = StringAlignment.Near,
             LineAlignment = StringAlignment.Center,
             Trimming = StringTrimming.EllipsisCharacter,
             FormatFlags = StringFormatFlags.NoWrap,
         };
-        var textRect = new RectangleF(rect.X + 13 * _scale, rect.Y, rect.Width - 16 * _scale, rect.Height);
-        g.DrawString(text, Font, textBrush, textRect, format);
+        var textX = barX + barW + 9 * _scale;
+        var textRect = new RectangleF(textX, rect.Y, rect.Right - textX - 6 * _scale, rect.Height);
+        g.DrawString(row.Text, Font, textBrush, textRect, format);
+    }
+
+    private static Color AdjustBrightness(Color color, float amount)
+    {
+        var light = color.GetBrightness() > 0.6f;
+        var r = light ? color.R - (int)(color.R * amount) : color.R + (int)((255 - color.R) * amount);
+        var g = light ? color.G - (int)(color.G * amount) : color.G + (int)((255 - color.G) * amount);
+        var b = light ? color.B - (int)(color.B * amount) : color.B + (int)((255 - color.B) * amount);
+        return Color.FromArgb(color.A, r, g, b);
     }
 
     private int HitTest(Point p)
     {
-        for (var i = 0; i < _chips.Count; i++)
-            if (_chips[i].FinalRect.Contains(p)) return i;
+        for (var i = 0; i < _rows.Count; i++)
+            if (_rows[i].FinalRect.Contains(p)) return i;
         return -1;
     }
 
@@ -254,6 +313,7 @@ public class FanPopup : Form
     {
         if (_hover == index || _fadingOut) return;
         _hover = index;
+        Cursor = index >= 0 ? Cursors.Hand : Cursors.Default;
         if (!_anim.Enabled) // 展開アニメ中はTickが描き直すので二重描画しない
         {
             RenderFrame(long.MaxValue);
@@ -261,12 +321,13 @@ public class FanPopup : Form
         }
     }
 
-    private void OnChipMouseUp(object? sender, MouseEventArgs e)
+    private void OnRowMouseUp(object? sender, MouseEventArgs e)
     {
-        if (e.Button != MouseButtons.Left) return;
+        if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Right) return;
         var i = HitTest(e.Location);
         if (i < 0) return;
-        var action = _chips[i].Action;
+        var action = e.Button == MouseButtons.Right ? _rows[i].RightAction : _rows[i].Action;
+        if (action == null) return;
         HideNow();
         action();
     }

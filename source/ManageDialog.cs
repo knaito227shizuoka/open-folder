@@ -1,6 +1,6 @@
 namespace OpenFolder;
 
-/// <summary>登録パスの一覧管理(追加・編集・削除)ダイアログ。一覧は名前の昇順。</summary>
+/// <summary>登録パスの一覧管理。追加・編集は子ウインドウで行う。</summary>
 public class ManageDialog : Form
 {
     private readonly ListBox _list = new();
@@ -12,11 +12,11 @@ public class ManageDialog : Form
 
         Text = "パスの管理";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(520, 280);
-        MinimumSize = new Size(420, 220);
+        ClientSize = new Size(620, 380);
+        MinimumSize = new Size(520, 300);
         Font = new Font("Yu Gothic UI", 9f);
 
-        _list.SetBounds(12, 12, 400, 256);
+        _list.SetBounds(12, 12, 480, 356);
         _list.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         _list.IntegralHeight = false;
         _list.DoubleClick += (_, _) => Edit();
@@ -28,17 +28,17 @@ public class ManageDialog : Form
         var y = 12;
         foreach (var (text, action) in buttons)
         {
-            var button = new Button { Text = text, Bounds = new Rectangle(424, y, 84, 28), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            var button = new Button { Text = text, Bounds = new Rectangle(504, y, 100, 30), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             button.Click += (_, _) => action();
             Controls.Add(button);
-            y += 34;
+            y += 38;
         }
 
         var closeButton = new Button
         {
             Text = "閉じる",
             DialogResult = DialogResult.OK,
-            Bounds = new Rectangle(424, 240, 84, 28),
+            Bounds = new Rectangle(504, 338, 100, 30),
             Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
         };
         CancelButton = closeButton;
@@ -50,6 +50,7 @@ public class ManageDialog : Form
 
     private void Refill(int selectIndex)
     {
+        _entries.Sort(PathEntry.ByName);
         _list.Items.Clear();
         foreach (var entry in _entries) _list.Items.Add(entry);
         if (_entries.Count > 0)
@@ -84,5 +85,4 @@ public class ManageDialog : Form
         _entries.RemoveAt(i);
         Refill(i);
     }
-
 }
