@@ -15,7 +15,13 @@
 dotnet run
 ```
 
-csproj はルートに置き、`source/` 以下の .cs は暗黙の glob で自動的にコンパイル対象になる。
+csproj はルートに置き、`source/` 以下の .cs は暗黙の glob で自動的にコンパイル対象になる(`tests/` は除外済み)。
+
+テスト:
+
+```
+dotnet run --project tests
+```
 
 ## 再起動(publish 版の更新)
 
@@ -31,13 +37,14 @@ csproj はルートに置き、`source/` 以下の .cs は暗黙の glob で自�
 - `source` : ソースコード
   - `Program.cs` : エントリポイント
   - `MainForm.cs` : 常駐ウィジェット本体(ホバー検知・ドラッグ移動・設定メニュー・アイコン描画)
-  - `FanPopup.cs` : ホバーで表示するパス一覧パネル。SF調のダーク1枚パネル(白枠(ウィジェット外周と同じ太さ1.6×scale)+シアンの対角コーナーブラケット)に行を縦に並べ、テキストは左揃え・各行左端にテーマ色のアクセントバー(暗い色はパネルに埋もれないよう自動で明るく補正)。per-pixelアルファの1枚レイヤードウィンドウ(`UpdateLayeredWindow`)にGDI+描画。透明部分は自動クリックスルー、`WS_EX_NOACTIVATE`でフォーカスを奪わない。角丸描画ヘルパー `Draw` もここ
-  - `Launcher.cs` : エディタ起動コマンド(WSL: `wsl -e bash -lc "code '<path>'"` / Win: `cmd /c code "<path>"`)と `\\wsl.localhost\...` → WSLパス変換
+  - `FanPopup.cs` : ホバーで表示するパス一覧パネル。SF調のダーク1枚パネル(白枠(ウィジェット外周と同じ太さ1.6×scale)+シアンの対角コーナーブラケット)に行を縦に並べる。各行はテーマ色で角丸に塗り(`ChipTheme`)、テキストは左揃え・背景輝度に応じて自動で黒/白。ホバー行は明るく補正。per-pixelアルファの1枚レイヤードウィンドウ(`UpdateLayeredWindow`)にGDI+描画。透明部分は自動クリックスルー、`WS_EX_NOACTIVATE`でフォーカスを奪わない。角丸描画ヘルパー `Draw` もここ
+  - `Launcher.cs` : エディタ起動コマンド(WSL: `cmd /c <editor> --remote wsl+<distro> "<path>"` — Windows側エディタCLIへWSLリモートとして渡す / Win: `cmd /c <editor> "<path>"`)。`\\wsl.localhost\...`・`\\wsl$\...` → WSL内パス+ディストリ名へ変換。`WslDistro` が未設定のWSLエントリは `wsl` から既定ディストリ名を取得して補う
   - `AppConfig.cs` : 設定の読み書き(保存先: `%APPDATA%\open-folder\settings.json`)
   - `EntryDialog.cs` : パス追加・編集ダイアログ(`/`始まりはWSL自動判定。名前は `{環境} : {親フォルダ} - {フォルダ名}` 形式で自動生成 — 例 `WSL : github - hoge`, `C : github - huga`)
   - `ManageDialog.cs` : パス一覧の管理(追加・編集・削除)ダイアログ
 - パス一覧は常に名前の昇順(`PathEntry.ByName`)。`AppConfig.Load`/`Save` でソートされるため手動並べ替えはない
-- `open-folder.csproj` : net6.0-windows / WinForms(SDKは6.0.300のみインストール済み)
+- `tests` : 純粋関数の characterization テスト(依存パッケージゼロの自前ランナー)。`dotnet run --project tests` で実行、終了コード=失敗数。オフラインで test SDK が復元できないため xunit/MSTest は使わない
+- `open-folder.csproj` : net6.0-windows / WinForms(SDKは6.0.300のみインストール済み)。`tests/**` は暗黙globから除外し、`OpenFolder.Tests` への `InternalsVisibleTo` を付与
 - `restart.ps1` : 常駐 exe の終了 → publish → 再起動を一括で行うスクリプト
 
 # 実装上の注意
