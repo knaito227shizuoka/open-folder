@@ -84,6 +84,16 @@ public class FanPopup : Form
         MouseUp += OnRowMouseUp;
     }
 
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _anim.Dispose();
+            _frame?.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+
     protected override bool ShowWithoutActivation => true;
 
     protected override CreateParams CreateParams

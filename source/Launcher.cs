@@ -70,8 +70,14 @@ public static class Launcher
         return false;
     }
 
+    private static string? _cachedDefaultDistro;
+
     private static string GetDefaultWslDistro()
     {
+        // 既定ディストリ名はセッション中変わらない前提でプロセス内にキャッシュする
+        // (WSL のコールドスタートを毎回の起動で繰り返さないため)。
+        if (_cachedDefaultDistro != null) return _cachedDefaultDistro;
+
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
         {
@@ -82,10 +88,20 @@ public static class Launcher
             CreateNoWindow = true,
         };
         process.Start();
+
+        // 先に終了を待つことでタイムアウトを実効化する($WSL_DISTRO_NAME は短いので
+        // パイプが詰まる心配はなく、終了後の ReadToEnd はブロックしない)。
+        if (!process.WaitForExit(3000))
+        {
+            try { process.Kill(); } catch { /* 既に終了している場合は無視 */ }
+            throw new InvalidOperationException("WSL の既定ディストリビューション名の取得がタイムアウトしました。");
+        }
+
         var distro = process.StandardOutput.ReadToEnd().Trim();
-        process.WaitForExit(3000);
         if (process.ExitCode != 0 || distro.Length == 0)
             throw new InvalidOperationException("WSL の既定ディストリビューション名を取得できませんでした。");
+
+        _cachedDefaultDistro = distro;
         return distro;
     }
 

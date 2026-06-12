@@ -102,9 +102,24 @@ public class AppConfig
         }
         catch
         {
-            // 壊れた設定ファイルは初期化する
+            // 読めない設定ファイルは初期化するが、次の Save() で上書きされて
+            // 登録パスを失う前に .bak へ退避して手動復旧の余地を残す。
+            TryBackupCorruptedFile();
         }
         return new AppConfig();
+    }
+
+    private static void TryBackupCorruptedFile()
+    {
+        try
+        {
+            if (File.Exists(FilePath))
+                File.Copy(FilePath, FilePath + ".bak", overwrite: true);
+        }
+        catch
+        {
+            // 退避に失敗しても起動は続行する(救済はベストエフォート)。
+        }
     }
 
     public void Save()

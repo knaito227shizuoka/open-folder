@@ -47,6 +47,20 @@
 - `tests/` に純粋関数4つ(GenerateName / TryConvertUncWslPath / NormalizeChipTheme / QuoteCmdArgument)の characterization test を追加。**25 ケース全 PASS**。
 - 本体 `dotnet build` は警告0のまま、`dotnet run`/`restart.ps1` への影響なし(tests はサブディレクトリの別プロジェクトなので root の publish/build は拾わない)。
 
+## 2026-06-12 実装(Phase 2-3)
+
+### Phase 2(ドキュメント整合)
+- AGENTS.md の Launcher 行を現実装(`cmd /c <editor> --remote wsl+<distro>`)に更新。
+- ついでに FanPopup 行の「各行左端にテーマ色のアクセントバー」が 83253fb で削除済みの旧仕様だったので訂正(行全体をテーマ色で塗る現仕様に)。証拠: git 83253fb "Remove popup row accent bars"。
+- tests 追加に伴いファイル一覧とテストコマンドを追記。README は Q1 回答待ちのため未変更。
+
+### Phase 3(防御的補強)
+- D2①②: `GetDefaultWslDistro` を「WaitForExit を先に呼んでタイムアウトを実効化 → Kill → 明示メッセージ例外」に変更し、結果を static キャッシュ。ReadToEnd の完全 async 化は提案止まり(proposals.md)。
+- D3: `AppConfig.Load` の catch で `settings.json` → `settings.json.bak` 退避を追加(挙動は従来どおり初期化を続行、データ救済の余地だけ追加)。
+- D8①: `FanPopup.Dispose(bool)` で `_anim`/`_frame` を破棄。
+- 実機検証: 壊れ JSON 投入 → restart → `.bak` 生成を確認。実設定(17エントリ)復元 → 正常起動・新規 .bak なしを確認。build 警告0・テスト 25 PASS。
+- **GUI クリック系スモーク(ホバー表示・行クリック起動・ドラッグ移動)は自動化できず未検証**。人手確認が必要。
+
 ---
 
 (以降、実装担当が気づきを追記すること)
