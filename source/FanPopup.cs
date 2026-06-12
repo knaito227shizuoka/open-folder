@@ -128,7 +128,7 @@ public class FanPopup : Form
         var n = _rows.Count;
         var pad = 6f * _scale;                    // パネル内側余白
         var rowGap = 2f * _scale;
-        var textLeft = 10f * _scale + 3f * _scale + 9f * _scale; // 行左端→バー→テキスト
+        var textLeft = 14f * _scale;
         var maxTextW = _rows.Max(r => r.TextWidth);
         var rowW = Math.Max(120 * _scale, textLeft + maxTextW + 14 * _scale);
 
@@ -271,15 +271,6 @@ public class FanPopup : Form
             g.DrawPath(rowPen, rowPath);
         }
 
-        // 左端のテーマ色アクセントバー
-        var barW = 3f * _scale;
-        var barH = rect.Height - 12 * _scale;
-        var barX = rect.X + 10 * _scale;
-        var bar = hover ? AdjustBrightness(row.TextColor, 0.25f) : row.TextColor;
-        using (var barPath = Draw.RoundedRect(barX, rect.Y + (rect.Height - barH) / 2, barW, barH, barW / 2))
-        using (var barBrush = new SolidBrush(Color.FromArgb(a, bar)))
-            g.FillPath(barBrush, barPath);
-
         using var textBrush = new SolidBrush(Color.FromArgb(a, row.TextColor));
         using var format = new StringFormat
         {
@@ -288,7 +279,7 @@ public class FanPopup : Form
             Trimming = StringTrimming.EllipsisCharacter,
             FormatFlags = StringFormatFlags.NoWrap,
         };
-        var textX = barX + barW + 9 * _scale;
+        var textX = rect.X + 14 * _scale;
         var textRect = new RectangleF(textX, rect.Y, rect.Right - textX - 6 * _scale, rect.Height);
         g.DrawString(row.Text, Font, textBrush, textRect, format);
     }
