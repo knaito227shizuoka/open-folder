@@ -31,4 +31,22 @@
 
 ---
 
+## 2026-06-12 実装(Claude / 実装担当・Phase 1)
+
+### 重大な環境制約: オフライン
+- このマシンは NuGet オフラインフィード(`Microsoft Visual Studio Offline Packages`)のみ。ネットワーク復元不可。
+- xunit / xunit.runner.visualstudio はフィードに存在しない。
+- MSTest(`mstest.testadapter` 2.2.7 等)は存在するが、`Microsoft.NET.Test.Sdk 16.11.0` が `NuGet.Frameworks >= 5.0.0` を要求し、フィードには 4.6.4 しか無いため `dotnet test` 系は復元不可。
+- **結論**: 指示書 D1 の「xunit でテスト」は環境的に不可能。依存パッケージゼロの**自前コンソールランナー**(`tests/OpenFolder.Tests.csproj` を `OutputType=Exe`)に切替。
+  - 実行コマンドは `dotnet test` ではなく **`dotnet run --project tests`**(終了コード = 失敗数)。
+  - characterization test の目的(退行検出)は同等に達成。ネットワークが復活したら xunit へ移行してよい(提案: proposals.md には未記載、軽微なので memo に留める)。
+
+### Phase 1 でやったこと
+- `open-folder.csproj` に `<Compile Remove="tests/**/*.cs" />`(暗黙glob除外)と `<InternalsVisibleTo Include="OpenFolder.Tests" />` を追加。
+- `Launcher.QuoteCmdArgument` を private → internal(テスト用。挙動不変)。
+- `tests/` に純粋関数4つ(GenerateName / TryConvertUncWslPath / NormalizeChipTheme / QuoteCmdArgument)の characterization test を追加。**25 ケース全 PASS**。
+- 本体 `dotnet build` は警告0のまま、`dotnet run`/`restart.ps1` への影響なし(tests はサブディレクトリの別プロジェクトなので root の publish/build は拾わない)。
+
+---
+
 (以降、実装担当が気づきを追記すること)

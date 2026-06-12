@@ -89,7 +89,7 @@ public static class Launcher
         return distro;
     }
 
-    private static string QuoteCmdArgument(string value)
+    internal static string QuoteCmdArgument(string value)
     {
         return "\"" + value.Replace("\"", "\"\"") + "\"";
     }

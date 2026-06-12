@@ -11,4 +11,14 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
+  <!-- 本体は source/ のみコンパイルする。tests/ は別プロジェクトなので暗黙globから除外。 -->
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
+  <!-- characterization test から internal な純粋関数(QuoteCmdArgument 等)を参照できるようにする。 -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenFolder.Tests" />
+  </ItemGroup>
+
 </Project>
