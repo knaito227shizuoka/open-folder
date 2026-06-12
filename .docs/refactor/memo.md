@@ -61,6 +61,21 @@
 - 実機検証: 壊れ JSON 投入 → restart → `.bak` 生成を確認。実設定(17エントリ)復元 → 正常起動・新規 .bak なしを確認。build 警告0・テスト 25 PASS。
 - **GUI クリック系スモーク(ホバー表示・行クリック起動・ドラッグ移動)は自動化できず未検証**。人手確認が必要。
 
+## 2026-06-12 実装(Phase 4-5)
+
+### Phase 4(責務分離 D4)
+- `NormalizeChipTheme`/`GetChipColor`/`GetFontColorForBackground` を `PathEntry` から新規 `source/ChipThemes.cs` へ移動。ロジック・出力は不変(テスト 25 PASS で確認)。
+- 呼び出し元(FanPopup×2, EntryDialog×2)とテスト参照を `ChipThemes.*` に差し替え。`PathEntry.ChipTheme`(JSON プロパティ)は不変。
+- `PathEntry.NormalizeChipTheme` という公開 static は無くなったので、外部から参照していたコードがあれば破壊的(このリポジトリ内では全て追従済み)。
+
+### Phase 5(提案のみ)
+- `proposals.md` に P1〜P6 を記載。いずれも未実装。Q3(WslDistro 永続化)・Q4(Editor 契約)・Q5(リネーム)の回答が前提の項目を含む。
+- 触らないと決めた軽微項目(DisplayName パススルー / DPI 計算重複 / Push の HBITMAP)は proposals 末尾に記録。
+
+### 全フェーズ完了時点の状態
+- build 警告0、テスト 25 PASS、アプリ常駐 OK。
+- 残課題: GUI クリック系スモーク(②ホバー表示 ③Windowsパス起動 ④WSLパス起動 ⑤管理ダイアログ ⑥ドラッグ移動)は人手確認待ち。README は Q1 回答待ちで未変更。
+
 ---
 
 (以降、実装担当が気づきを追記すること)
