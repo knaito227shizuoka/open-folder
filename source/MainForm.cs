@@ -95,6 +95,13 @@ public class MainForm : Form
                    Color.FromArgb(20, 26, 48), Color.FromArgb(8, 10, 22), 65f))
             g.FillRectangle(bg, 0, 0, _widgetSize, _widgetSize);
 
+        // 外周の白枠(Regionの角丸に沿わせる。線幅の半分だけ内側に寄せて欠けを防ぐ)
+        var bw = 1.6f * s;
+        using (var rim = Draw.RoundedRect(bw / 2, bw / 2, _widgetSize - bw, _widgetSize - bw,
+                   _widgetSize * 0.25f - bw / 2))
+        using (var rimPen = new Pen(Color.FromArgb(230, Color.White), bw))
+            g.DrawPath(rimPen, rim);
+
         // 六角形フレーム(頂点が上)
         var hex = new PointF[6];
         for (var i = 0; i < 6; i++)

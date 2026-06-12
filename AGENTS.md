@@ -17,18 +17,28 @@ dotnet run
 
 csproj はルートに置き、`source/` 以下の .cs は暗黙の glob で自動的にコンパイル対象になる。
 
+## 再起動(publish 版の更新)
+
+```
+.\restart.ps1
+```
+
+常駐中の `OpenFolder.exe` を終了 → `dotnet publish -c Release -o publish\OpenFolder` → exe を起動、までを一括で行う。
+普段は `./publish` の exe が常駐しており、Mutex の多重起動防止で `dotnet run` は静かに終了してしまうため、コード変更を反映するにはこのスクリプトを使う。
+
 # ファイル
 - `.docs` : 資料
 - `source` : ソースコード
   - `Program.cs` : エントリポイント
   - `MainForm.cs` : 常駐ウィジェット本体(ホバー検知・ドラッグ移動・設定メニュー・アイコン描画)
-  - `FanPopup.cs` : ホバーで表示するパス一覧パネル。SF調のダーク1枚パネル(シアンの細枠+対角コーナーブラケット)に行を縦に並べ、テキストは左揃え・各行左端にテーマ色のアクセントバー(暗い色はパネルに埋もれないよう自動で明るく補正)。per-pixelアルファの1枚レイヤードウィンドウ(`UpdateLayeredWindow`)にGDI+描画。透明部分は自動クリックスルー、`WS_EX_NOACTIVATE`でフォーカスを奪わない。角丸描画ヘルパー `Draw` もここ
+  - `FanPopup.cs` : ホバーで表示するパス一覧パネル。SF調のダーク1枚パネル(白枠(ウィジェット外周と同じ太さ1.6×scale)+シアンの対角コーナーブラケット)に行を縦に並べ、テキストは左揃え・各行左端にテーマ色のアクセントバー(暗い色はパネルに埋もれないよう自動で明るく補正)。per-pixelアルファの1枚レイヤードウィンドウ(`UpdateLayeredWindow`)にGDI+描画。透明部分は自動クリックスルー、`WS_EX_NOACTIVATE`でフォーカスを奪わない。角丸描画ヘルパー `Draw` もここ
   - `Launcher.cs` : エディタ起動コマンド(WSL: `wsl -e bash -lc "code '<path>'"` / Win: `cmd /c code "<path>"`)と `\\wsl.localhost\...` → WSLパス変換
   - `AppConfig.cs` : 設定の読み書き(保存先: `%APPDATA%\open-folder\settings.json`)
   - `EntryDialog.cs` : パス追加・編集ダイアログ(`/`始まりはWSL自動判定。名前は `{環境} : {親フォルダ} - {フォルダ名}` 形式で自動生成 — 例 `WSL : github - hoge`, `C : github - huga`)
   - `ManageDialog.cs` : パス一覧の管理(追加・編集・削除)ダイアログ
 - パス一覧は常に名前の昇順(`PathEntry.ByName`)。`AppConfig.Load`/`Save` でソートされるため手動並べ替えはない
 - `open-folder.csproj` : net6.0-windows / WinForms(SDKは6.0.300のみインストール済み)
+- `restart.ps1` : 常駐 exe の終了 → publish → 再起動を一括で行うスクリプト
 
 # 実装上の注意
 - 多重起動はMutex(`Local\open-folder-widget`)で防止。2個目は起動直後に静かに終了する。

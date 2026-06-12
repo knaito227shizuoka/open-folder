@@ -237,7 +237,7 @@ public class FanPopup : Form
         var radius = 10 * _scale;
         using var path = Draw.RoundedRect(rect.X, rect.Y, rect.Width, rect.Height, radius);
         using var brush = new SolidBrush(Color.FromArgb(a * 235 / 255, PanelFill));
-        using var pen = new Pen(Color.FromArgb(a * 100 / 255, PanelBorder), 1f);
+        using var pen = new Pen(Color.FromArgb(a * 230 / 255, Color.White), 1.6f * _scale);
         g.FillPath(brush, path);
         g.DrawPath(pen, path);
 
