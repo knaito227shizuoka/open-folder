@@ -6,18 +6,18 @@ namespace OpenFolder;
 /// <summary>
 /// デスクトップに常駐する小型ウィジェット。
 /// マウスオーバー: 登録パス一覧 / 右クリック: 設定メニュー / ドラッグ: 移動
-/// Win+Shift+Z: ポップアップを強制表示(マウスがパネルに乗るまで閉じない)
+/// Ctrl+Alt+Z: ポップアップを強制表示(マウスがパネルに乗るまで閉じない)
 /// </summary>
 public class MainForm : Form
 {
     private const int BaseSize = 56;       // 96dpi基準の論理サイズ
     private const int DragThreshold = 5;
 
-    // グローバルホットキー: Win+Shift+Z
+    // グローバルホットキー: Ctrl+Alt+Z
     private const int HotkeyId = 1;
-    private const uint MOD_SHIFT = 0x0004;
-    private const uint MOD_WIN   = 0x0008;
-    private const uint VK_Z      = 0x5A;
+    private const uint MOD_CTRL = 0x0002;
+    private const uint MOD_ALT  = 0x0001;
+    private const uint VK_Z     = 0x5A;
     private const int  WM_HOTKEY = 0x0312;
 
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -71,7 +71,7 @@ public class MainForm : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        RegisterHotKey(Handle, HotkeyId, MOD_WIN | MOD_SHIFT, VK_Z);
+        RegisterHotKey(Handle, HotkeyId, MOD_CTRL | MOD_ALT, VK_Z);
     }
 
     protected override void WndProc(ref Message m)
