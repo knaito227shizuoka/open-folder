@@ -20,6 +20,7 @@ internal static class Program
         TryConvertUncWslPath_Cases();
         NormalizeChipTheme_Cases();
         QuoteCmdArgument_Cases();
+        EntrySearch_Cases();
 
         Console.WriteLine();
         Console.WriteLine($"結果: {_passed} passed, {_failed} failed");
@@ -72,12 +73,63 @@ internal static class Program
         Eq("\"a\"\"b\"", Launcher.QuoteCmdArgument("a\"b"));                   // " は "" にエスケープ
     }
 
+    private static void EntrySearch_Cases()
+    {
+        Section(nameof(EntrySearch.Filter));
+        var entries = new List<PathEntry>
+        {
+            new() { Name = "C : github - foo", Path = @"C:\github\foo" },
+            new() { Name = "C : work - bar",   Path = @"C:\work\bar" },
+            new() { Name = "WSL : home - baz", Path = "/home/user/baz", IsWsl = true, WslDistro = "Ubuntu" },
+        };
+
+        // 空クエリ → 全件(名前昇順)
+        var all = EntrySearch.Filter(entries, "");
+        EqInt(3, all.Count);
+        Eq("C : github - foo", all[0].Name);
+        Eq("C : work - bar",   all[1].Name);
+        Eq("WSL : home - baz", all[2].Name);
+
+        // 名前の部分一致
+        var byName = EntrySearch.Filter(entries, "github");
+        EqInt(1, byName.Count);
+        Eq("C : github - foo", byName[0].Name);
+
+        // パスの部分一致
+        var byPath = EntrySearch.Filter(entries, "work");
+        EqInt(1, byPath.Count);
+        Eq("C : work - bar", byPath[0].Name);
+
+        // 大文字小文字無視
+        var ci = EntrySearch.Filter(entries, "GITHUB");
+        EqInt(1, ci.Count);
+        Eq("C : github - foo", ci[0].Name);
+
+        // 0件
+        var none = EntrySearch.Filter(entries, "zzz");
+        EqInt(0, none.Count);
+    }
+
     // ---- 簡易アサーション ----
 
     private static void Section(string name)
     {
         Console.WriteLine();
         Console.WriteLine($"[{name}]");
+    }
+
+    private static void EqInt(int expected, int actual)
+    {
+        if (expected == actual)
+        {
+            _passed++;
+            Console.WriteLine($"  PASS  {actual}");
+        }
+        else
+        {
+            _failed++;
+            Console.WriteLine($"  FAIL  expected {expected} but got {actual}");
+        }
     }
 
     private static void Eq(string expected, string actual)
