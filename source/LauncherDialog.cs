@@ -22,7 +22,8 @@ public class LauncherDialog : Form
     private static readonly Color C_TextNorm = Color.FromArgb(195, 195, 218);
     private static readonly Color C_TextSel  = Color.White;
     private static readonly Color C_TextMatch = Color.FromArgb(130, 215, 255);  // シアン(マッチ箇所)
-    private static readonly Color C_Border   = Color.FromArgb(100, 100, 150);
+    private static readonly Color C_Border      = Color.FromArgb(130, 130, 185);
+    private static readonly Color C_BorderInner = Color.FromArgb(58, 58, 88);
     private static readonly Color C_Sep      = Color.FromArgb(50, 50, 75);
     private static readonly Color C_SearchBg = Color.FromArgb(32, 32, 50);
     private static readonly Color C_BtnBg    = Color.FromArgb(42, 42, 64);
@@ -118,7 +119,7 @@ public class LauncherDialog : Form
             TabStop             = false,
             IntegralHeight      = false,
             HorizontalScrollbar = false,
-            Location            = new Point(1, L_TopBar + L_Sep),
+            Location            = new Point(5, L_TopBar + L_Sep),
         };
 
         // ---- イベント ----
@@ -168,9 +169,11 @@ public class LauncherDialog : Form
         using (var sepBrush = new SolidBrush(C_Sep))
             g.FillRectangle(sepBrush, 0, L_TopBar, ClientSize.Width, L_Sep);
 
-        // フォームの外枠
-        using var pen = new Pen(C_Border);
-        g.DrawRectangle(pen, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
+        // フォームの外枠(2重線)
+        using var penOuter = new Pen(C_Border, 2f);
+        g.DrawRectangle(penOuter, 1, 1, ClientSize.Width - 2, ClientSize.Height - 2);
+        using var penInner = new Pen(C_BorderInner);
+        g.DrawRectangle(penInner, 4, 4, ClientSize.Width - 8, ClientSize.Height - 8);
     }
 
     // ---- 公開 API ----
@@ -211,8 +214,8 @@ public class LauncherDialog : Form
     {
         var rows  = Math.Max(L_MinRows, Math.Min(L_MaxRows, _config.Entries.Count));
         var listH = rows * L_RowH;
-        _list.Size = new Size(L_Width - 2, listH);   // 左右 1px を枠に開ける
-        ClientSize = new Size(L_Width, L_TopBar + L_Sep + listH + 1);  // 下 1px を枠に開ける
+        _list.Size = new Size(L_Width - 10, listH);  // 左右 5px を枠に開ける
+        ClientSize = new Size(L_Width, L_TopBar + L_Sep + listH + 5);  // 下 5px を枠に開ける
     }
 
     private void CenterOnActiveScreen()
