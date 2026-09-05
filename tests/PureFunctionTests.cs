@@ -14,8 +14,16 @@ internal static class Program
     private static int _passed;
     private static int _failed;
 
-    private static int Main()
+    [STAThread]
+    private static int Main(string[] args)
     {
+        if (args.Contains("--display"))
+        {
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+            Application.EnableVisualStyles();
+            DisplayLayout_Cases();
+            return _failed;
+        }
         GenerateName_Cases();
         TryConvertUncWslPath_Cases();
         NormalizeChipTheme_Cases();
@@ -25,6 +33,53 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine($"結果: {_passed} passed, {_failed} failed");
         return _failed;
+    }
+
+    private static void DisplayLayout_Cases()
+    {
+        // 設定ファイルやエディタには触れず、透明なフォームを各画面へ往復させる。
+        var config = new AppConfig();
+        for (var i = 0; i < 32; i++)
+            config.Entries.Add(new PathEntry { Name = $"Entry {i:00}", Path = @"C:\test", IsWsl = i >= 12 });
+        using var dialog = new LauncherDialog(config) { Opacity = 0 };
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var workField = typeof(LauncherDialog).GetField("_workArea", flags)!;
+        var resize = typeof(LauncherDialog).GetMethod("ResizeToFit", flags)!;
+        dialog.Show();
+        foreach (var screen in Screen.AllScreens.Concat(Screen.AllScreens.Reverse()))
+        {
+            workField.SetValue(dialog, screen.WorkingArea);
+            dialog.Location = screen.WorkingArea.Location;
+            Application.DoEvents();
+            resize.Invoke(dialog, null);
+            Application.DoEvents();
+            var lists = dialog.Controls.OfType<ListBox>().OrderBy(l => l.Left).ToArray();
+            var list = lists[0];
+            var right = lists[1];
+            var dpi = dialog.DeviceDpi;
+            Console.WriteLine($"Display {screen.DeviceName}: DPI={dpi}, form={dialog.ClientSize}, list={list.Size}");
+            EqInt((int)Math.Round(32 * dpi / 96.0), list.ItemHeight);
+            EqInt(12, list.Items.Count);
+            EqInt(20, right.Items.Count);
+            EqInt(1, list.Items.Cast<PathEntry>().All(e => !e.IsWsl) ? 1 : 0);
+            EqInt(1, right.Items.Cast<PathEntry>().All(e => e.IsWsl) ? 1 : 0);
+            EqInt(list.Right, right.Left);
+            EqInt(dialog.ClientSize.Width, right.Right + list.Left);
+            EqInt(dialog.ClientSize.Height, list.Bottom + list.Left);
+            EqInt(1, screen.WorkingArea.Contains(dialog.Bounds) ? 1 : 0);
+        }
+        var query = dialog.Controls.OfType<Panel>().Single().Controls.OfType<TextBox>().Single();
+        query.Text = "Entry 31";
+        var columns = dialog.Controls.OfType<ListBox>().OrderBy(l => l.Left).ToArray();
+        EqInt(0, columns[0].Items.Count);
+        EqInt(1, columns[1].Items.Count);
+        Eq("Entry 31", ((PathEntry)columns[1].SelectedItem!).Name);
+        query.Text = "no match";
+        EqInt(0, columns.Sum(l => l.Items.Count));
+        query.Text = "Entry 00";
+        EqInt(1, columns[0].Items.Count);
+        EqInt(0, columns[1].Items.Count);
+        dialog.RealClose();
     }
 
     private static void GenerateName_Cases()
@@ -176,3 +231,5 @@ internal static class Program
         }
     }
 }
+
+

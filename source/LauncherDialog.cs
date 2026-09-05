@@ -33,17 +33,32 @@ public class LauncherDialog : Form
     private readonly AppConfig _config;
     private List<PathEntry> _filteredEntries = new();
     private bool _realClose;
+    private Rectangle _workArea;
 
     private readonly Panel   _searchPanel;
     private readonly TextBox _queryBox;
     private readonly Button  _settingsButton;
     private readonly Button  _addButton;
-    private readonly ListBox _list;
+    private readonly ListBox _windowsList;
+    private readonly ListBox _wslList;
+    private ListBox _list = null!;
+
+    private void SelectIndex(int index)
+    {
+        if (index < 0 || index >= _filteredEntries.Count) return;
+        var entry = _filteredEntries[index];
+        _list = entry.IsWsl ? _wslList : _windowsList;
+        (entry.IsWsl ? _windowsList : _wslList).ClearSelected();
+        _list.SelectedItem = entry;
+    }
     private Font _boldFont = null!;
 
     public LauncherDialog(AppConfig config)
     {
         _config = config;
+        // 座標はすべて96 DPI基準から再計算する。自動拡縮との二重適用を防ぐ。
+        AutoScaleMode = AutoScaleMode.None;
+        _workArea = Screen.FromPoint(Cursor.Position).WorkingArea;
 
         Font      = new Font("Yu Gothic UI", 10f);
         _boldFont = new Font(Font, FontStyle.Bold);
@@ -109,7 +124,30 @@ public class LauncherDialog : Form
             btn.LostFocus += (_, _) => btn.FlatAppearance.BorderColor = C_Border;
         }
 
-        _list = new ListBox
+        _windowsList = MakeList();
+        _wslList = MakeList();
+        _list = _windowsList;
+        // ---- イベント ----
+        _queryBox.TextChanged += OnQueryChanged;
+        _queryBox.KeyDown     += OnQueryKeyDown;
+        _settingsButton.Click += OnSettingsClick;
+        _addButton.Click      += OnAddClick;
+
+
+
+
+        KeyDown    += (_, e) => { if (e.KeyCode == Keys.Escape) { e.Handled = true; Hide(); } };
+        Deactivate += (_, _) => Hide();
+        FormClosing += (_, e) => { if (!_realClose) { e.Cancel = true; Hide(); } };
+
+        Controls.AddRange(new Control[] { _searchPanel, _settingsButton, _addButton, _windowsList, _wslList });
+        ApplyFilter();
+        ResizeToFit();
+    }
+
+    private ListBox MakeList()
+    {
+        var list = new ListBox
         {
             DrawMode            = DrawMode.OwnerDrawFixed,
             ItemHeight          = L_RowH,
@@ -120,27 +158,16 @@ public class LauncherDialog : Form
             TabStop             = false,
             IntegralHeight      = false,
             HorizontalScrollbar = false,
-            MultiColumn         = true,
+            MultiColumn         = false,
             ColumnWidth         = (L_Width - 10) / L_Columns,
             Location            = new Point(5, L_TopBar + L_Sep),
         };
 
-        // ---- イベント ----
-        _queryBox.TextChanged += OnQueryChanged;
-        _queryBox.KeyDown     += OnQueryKeyDown;
-        _settingsButton.Click += OnSettingsClick;
-        _addButton.Click      += OnAddClick;
-        _list.DrawItem        += OnDrawItem;
-        _list.MouseClick      += OnListMouseClick;
-        _list.MouseMove       += OnListMouseMove;
-
-        KeyDown    += (_, e) => { if (e.KeyCode == Keys.Escape) { e.Handled = true; Hide(); } };
-        Deactivate += (_, _) => Hide();
-        FormClosing += (_, e) => { if (!_realClose) { e.Cancel = true; Hide(); } };
-
-        Controls.AddRange(new Control[] { _searchPanel, _settingsButton, _addButton, _list });
-        ApplyFilter();
-        ResizeToFit();
+        list.DrawItem += OnDrawItem;
+        list.MouseClick += OnListMouseClick;
+        list.MouseMove += OnListMouseMove;
+        list.KeyDown += OnQueryKeyDown;
+        return list;
     }
 
     private Button MakeButton(string text, int x, int y, int w, int h, int tabIndex)
@@ -170,22 +197,26 @@ public class LauncherDialog : Form
 
         // 検索欄とリストの区切り線
         using (var sepBrush = new SolidBrush(C_Sep))
-            g.FillRectangle(sepBrush, 0, L_TopBar, ClientSize.Width, L_Sep);
+            g.FillRectangle(sepBrush, 0, Px(L_TopBar), ClientSize.Width, Px(L_Sep));
 
         // フォームの外枠(2重線)
-        using var penOuter = new Pen(C_Border, 2f);
-        g.DrawRectangle(penOuter, 1, 1, ClientSize.Width - 2, ClientSize.Height - 2);
+        using var penOuter = new Pen(C_Border, Px(2));
+        g.DrawRectangle(penOuter, Px(1), Px(1), ClientSize.Width - Px(2), ClientSize.Height - Px(2));
         using var penInner = new Pen(C_BorderInner);
-        g.DrawRectangle(penInner, 4, 4, ClientSize.Width - 8, ClientSize.Height - 8);
+        g.DrawRectangle(penInner, Px(4), Px(4), ClientSize.Width - Px(8), ClientSize.Height - Px(8));
     }
 
     // ---- 公開 API ----
 
     public void ResetAndShow()
     {
+        _workArea = Screen.FromPoint(Cursor.Position).WorkingArea;
+        // 先に対象画面へ移し、その画面のDPIが確定してからレイアウトする。
+        Location = new Point(_workArea.Left + (_workArea.Width - Width) / 2,
+            _workArea.Top + (_workArea.Height - Height) / 2);
         _queryBox.Text = "";
         ApplyFilter();
-        if (_list.Items.Count > 0) _list.SelectedIndex = 0;
+        SelectIndex(0);
         TopMost = _config.AlwaysOnTop;
 
         if (!Visible) Show();
@@ -213,22 +244,57 @@ public class LauncherDialog : Form
 
     // ---- レイアウト ----
 
+    private int Px(int value) => (int)Math.Round(value * DeviceDpi / 96.0);
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        // OSが提案する外枠サイズの適用後に、中身も同じDPIで確定する。
+        BeginInvoke(() =>
+        {
+            if (IsDisposed || _realClose) return;
+            ResizeToFit();
+            CenterOnActiveScreen();
+        });
+    }
+
     private void ResizeToFit()
     {
-        var work = Screen.FromPoint(Cursor.Position).WorkingArea;
+        var work = _workArea;
+        var width = Math.Min(Px(L_Width), work.Width - Px(24));
+        var inset = Px(5);
+        var top = Px(L_TopBar);
+        var sep = Px(L_Sep);
+
+        _windowsList.ItemHeight = _wslList.ItemHeight = Px(L_RowH);
         var maxRows = Math.Max(1, Math.Min(L_MaxRows,
-            (work.Height - L_TopBar - L_Sep - 5 - 24 - SystemInformation.HorizontalScrollBarHeight) / _list.ItemHeight));
+            (work.Height - top - sep - inset - Px(24)) / _list.ItemHeight));
         var rows = Math.Min(maxRows, Math.Max(L_MinRows,
-            (_config.Entries.Count + L_Columns - 1) / L_Columns));
-        // MultiColumn は上から下、次に右列へ並ぶ。あふれた列は横スクロール。
-        var listH = rows * _list.ItemHeight + SystemInformation.HorizontalScrollBarHeight;
-        _list.Size = new Size(L_Width - 10, listH);  // 左右 5px を枠に開ける
-        ClientSize = new Size(L_Width, L_TopBar + L_Sep + listH + 5);  // 下 5px を枠に開ける
+            Math.Max(_config.Entries.Count(e => !e.IsWsl), _config.Entries.Count(e => e.IsWsl))));
+        // 環境ごとに列を固定し、各列で縦スクロールする。
+        var listH = rows * _list.ItemHeight;
+        SuspendLayout();
+        ClientSize = new Size(width, top + sep + listH + inset);
+        var columnWidth = (width - inset * 2) / L_Columns;
+        _windowsList.SetBounds(inset, top + sep, columnWidth, listH);
+        _wslList.SetBounds(inset + columnWidth, top + sep, width - inset * 2 - columnWidth, listH);
+        var sp = Px(12);
+        var gap = Px(6);
+        _addButton.SetBounds(width - sp - Px(84), Px(16), Px(84), Px(32));
+        _settingsButton.SetBounds(_addButton.Left - gap - Px(66), Px(16), Px(66), Px(32));
+        _searchPanel.SetBounds(sp, Px(14), _settingsButton.Left - gap - sp, Px(36));
+        _queryBox.Width = _searchPanel.Width - Px(8);
+        _queryBox.Location = new Point(Px(4), Math.Max(0, (_searchPanel.Height - _queryBox.PreferredHeight) / 2));
+        ResumeLayout(false);
+        Invalidate(true);
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetricsForDpi(int index, uint dpi);
 
     private void CenterOnActiveScreen()
     {
-        var work = Screen.FromPoint(Cursor.Position).WorkingArea;
+        var work = _workArea;
         Location = new Point(
             work.Left + (work.Width  - Width)  / 2,
             work.Top  + (work.Height - Height) / 2);
@@ -239,12 +305,18 @@ public class LauncherDialog : Form
     private void ApplyFilter()
     {
         _filteredEntries = EntrySearch.Filter(_config.Entries, _queryBox.Text.Trim());
-        _list.BeginUpdate();
-        _list.Items.Clear();
-        foreach (var entry in _filteredEntries) _list.Items.Add(entry);
-        _list.EndUpdate();
+        _filteredEntries = _filteredEntries.Where(e => !e.IsWsl)
+            .Concat(_filteredEntries.Where(e => e.IsWsl)).ToList();
+        foreach (var list in new[] { _windowsList, _wslList })
+        {
+            list.BeginUpdate();
+            list.Items.Clear();
+            foreach (var entry in _filteredEntries.Where(e => e.IsWsl == (list == _wslList)))
+                list.Items.Add(entry);
+            list.EndUpdate();
+        }
+        SelectIndex(0);
     }
-
     // ---- キーボード ----
 
     private void OnQueryKeyDown(object? sender, KeyEventArgs e)
@@ -261,29 +333,15 @@ public class LauncherDialog : Form
     {
         if (_filteredEntries.Count == 0) return;
         var n    = _filteredEntries.Count;
-        var cur  = _list.SelectedIndex;
+        var cur = _list.SelectedItem is PathEntry selected ? _filteredEntries.IndexOf(selected) : -1;
         var next = cur < 0 ? (delta > 0 ? 0 : n - 1) : (cur + delta + n) % n;
-        _list.SelectedIndex = next;
-        ScrollIntoView(next);
-    }
-
-    private void ScrollIntoView(int index)
-    {
-        if (index < 0 || index >= _list.Items.Count) return;
-        var rows = Math.Max(1, _list.ClientSize.Height / Math.Max(1, _list.ItemHeight));
-        var visible = rows * L_Columns;
-        if (index < _list.TopIndex)
-            _list.TopIndex = index / rows * rows;
-        else if (index >= _list.TopIndex + visible)
-            _list.TopIndex = Math.Max(0, (index / rows - L_Columns + 1) * rows);
+        SelectIndex(next);
     }
 
     private void OpenSelected()
     {
-        var i = _list.SelectedIndex;
-        if (i >= 0 && i < _filteredEntries.Count) OpenEntry(_filteredEntries[i]);
+        if (_list.SelectedItem is PathEntry entry) OpenEntry(entry);
     }
-
     private void OpenEntry(PathEntry entry)
     {
         Hide();
@@ -298,7 +356,7 @@ public class LauncherDialog : Form
     private void OnQueryChanged(object? sender, EventArgs e)
     {
         ApplyFilter();
-        if (_filteredEntries.Count > 0) _list.SelectedIndex = 0;
+        SelectIndex(0);
     }
 
     // ---- 描画 ----
@@ -311,8 +369,8 @@ public class LauncherDialog : Form
 
     private void OnDrawItem(object? sender, DrawItemEventArgs e)
     {
-        if (e.Index < 0 || e.Index >= _filteredEntries.Count) return;
-        var entry    = _filteredEntries[e.Index];
+        if (sender is not ListBox list || e.Index < 0 || e.Index >= list.Items.Count) return;
+        var entry = (PathEntry)list.Items[e.Index];
         var selected = (e.State & DrawItemState.Selected) != 0;
         var g        = e.Graphics;
 
@@ -323,8 +381,8 @@ public class LauncherDialog : Form
             g.FillRectangle(bgBrush, e.Bounds);
 
         // チップカラーを左右余白の内側・行間 1px の下に塗る
-        var chipX    = e.Bounds.X + L_RowPadL;
-        var chipW    = e.Bounds.Width - L_RowPadL - L_RowPadR;
+        var chipX    = e.Bounds.X + Px(L_RowPadL);
+        var chipW    = e.Bounds.Width - Px(L_RowPadL) - Px(L_RowPadR);
         var chipRect = new Rectangle(chipX, e.Bounds.Y + 1, chipW, e.Bounds.Height - 1);
         using (var chipBrush = new SolidBrush(chipColor))
             g.FillRectangle(chipBrush, chipRect);
@@ -332,13 +390,13 @@ public class LauncherDialog : Form
         // 選択時: 余白幅ぴったりの左右バー + 上下 2px ライン(隙間なし)
         if (selected)
         {
-            const int bTB = 4;
-            var cw = e.Bounds.Width - L_RowPadL - L_RowPadR;
+            var bTB = Px(4);
+            var cw = e.Bounds.Width - Px(L_RowPadL) - Px(L_RowPadR);
             using var b = new SolidBrush(Color.FromArgb(80, 165, 255));
-            g.FillRectangle(b, e.Bounds.X,                  e.Bounds.Y,             L_RowPadL, e.Bounds.Height); // 左(余白全体)
-            g.FillRectangle(b, e.Bounds.Right - L_RowPadR,  e.Bounds.Y,             L_RowPadR, e.Bounds.Height); // 右(余白全体)
-            g.FillRectangle(b, e.Bounds.X + L_RowPadL,      e.Bounds.Y,             cw,        bTB);             // 上
-            g.FillRectangle(b, e.Bounds.X + L_RowPadL,      e.Bounds.Bottom - bTB,  cw,        bTB);             // 下
+            g.FillRectangle(b, e.Bounds.X,                  e.Bounds.Y,             Px(L_RowPadL), e.Bounds.Height); // 左(余白全体)
+            g.FillRectangle(b, e.Bounds.Right - Px(L_RowPadR),  e.Bounds.Y,             Px(L_RowPadR), e.Bounds.Height); // 右(余白全体)
+            g.FillRectangle(b, e.Bounds.X + Px(L_RowPadL),      e.Bounds.Y,             cw,        bTB);             // 上
+            g.FillRectangle(b, e.Bounds.X + Px(L_RowPadL),      e.Bounds.Bottom - bTB,  cw,        bTB);             // 下
         }
 
         // テキスト色はチップ背景の輝度で自動判定
@@ -346,8 +404,8 @@ public class LauncherDialog : Form
         var isDark        = chipColor.GetBrightness() <= 0.6f;
         var matchColor    = isDark ? C_TextMatch : Color.FromArgb(0, 90, 210);
 
-        var textX    = chipX + 8;
-        var textRect = new Rectangle(textX, e.Bounds.Y, chipRect.Right - textX - 4, e.Bounds.Height);
+        var textX    = chipX + Px(8);
+        var textRect = new Rectangle(textX, e.Bounds.Y, chipRect.Right - textX - Px(4), e.Bounds.Height);
         var state = g.Save();
         g.SetClip(textRect, System.Drawing.Drawing2D.CombineMode.Intersect);
         DrawHighlightedText(g, entry.Name, _queryBox.Text.Trim(), Font, _boldFont, baseTextColor, matchColor, textRect);
@@ -401,17 +459,17 @@ public class LauncherDialog : Form
 
     private void OnListMouseMove(object? sender, MouseEventArgs e)
     {
-        var i = _list.IndexFromPoint(e.Location);
-        if (i >= 0 && i < _filteredEntries.Count && _list.SelectedIndex != i)
-            _list.SelectedIndex = i;
+        if (sender is not ListBox list) return;
+        var i = list.IndexFromPoint(e.Location);
+        if (i >= 0) SelectIndex(_filteredEntries.IndexOf((PathEntry)list.Items[i]));
     }
 
     private void OnListMouseClick(object? sender, MouseEventArgs e)
     {
-        var i = _list.IndexFromPoint(e.Location);
-        if (i >= 0 && i < _filteredEntries.Count) OpenEntry(_filteredEntries[i]);
+        if (e.Button != MouseButtons.Left || sender is not ListBox list) return;
+        var i = list.IndexFromPoint(e.Location);
+        if (i >= 0) OpenEntry((PathEntry)list.Items[i]);
     }
-
     // ---- 設定ボタン ----
 
     private void OnSettingsClick(object? sender, EventArgs e)
@@ -455,7 +513,7 @@ public class LauncherDialog : Form
         _config.Save();
         ResizeToFit();
         ApplyFilter();
-        if (_filteredEntries.Count > 0 && _list.SelectedIndex < 0) _list.SelectedIndex = 0;
+        SelectIndex(0);
         Show(); Activate(); _queryBox.Focus();
     }
 
@@ -478,15 +536,17 @@ public class LauncherDialog : Form
         var idx = _filteredEntries.IndexOf(dialog.Entry);
         if (idx >= 0)
         {
-            _list.SelectedIndex = idx;
+            SelectIndex(idx);
         }
         else
         {
             _queryBox.Text = "";
             ApplyFilter();
             idx = _filteredEntries.IndexOf(dialog.Entry);
-            if (idx >= 0) _list.SelectedIndex = idx;
+            if (idx >= 0) SelectIndex(idx);
         }
         Show(); Activate(); _queryBox.Focus();
     }
 }
+
+

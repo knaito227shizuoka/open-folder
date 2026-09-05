@@ -43,7 +43,7 @@ dotnet run --project tests  # テスト(終了コード=失敗数)
 - `source` : ソースコード
   - `Program.cs` : エントリポイント(Mutex で多重起動防止 → `MainForm` 起動)
   - `MainForm.cs` : ホットキー受け取り専用の不可視ウィンドウ(Opacity=0, Size=1x1)。`Ctrl+Alt+Z` で `LauncherDialog` を表示/非表示トグルする
-  - `LauncherDialog.cs` : 検索モーダル本体。検索入力欄・「設定」「新規追加」ボタン・候補 `ListBox`(OwnerDraw / MultiColumn)で構成。幅900px、1列445pxの2列表示。名前順に上から下、左列から右列へ並び、最大30行×2列(画面高さで制限)。超過時は横スクロール。`ResetAndShow()` でリセット表示、`RealClose()` でアプリ終了時に Dispose
+  - `LauncherDialog.cs` : 検索モーダル本体。検索入力欄・「設定」「新規追加」ボタン・候補 `ListBox`2個(OwnerDraw)で構成。幅900px、1列445pxの2列表示。左はWindows(IsWsl=false)、右はWSL(IsWsl=true)で固定し、各列内は名前順。最大30行×2列(画面高さで制限)、各列で縦スクロール。検索時も列は固定。↑↓は左列→右列の順に巡回し、選択は常に1件。`ResetAndShow()` でリセット表示、`RealClose()` でアプリ終了時に Dispose
   - `EntrySearch.cs` : 純粋関数 `Filter(entries, query)` — 名前・パス・WslDistro の部分一致フィルタ、名前昇順を保証
   - `FanPopup.cs` : 旧ホバーパネル(現在は未使用)。`Draw.RoundedRect` ヘルパーはここにある
   - `Launcher.cs` : エディタ起動コマンド(WSL: `cmd /c <editor> --remote wsl+<distro> "<path>"` — Windows側エディタCLIへWSLリモートとして渡す / Win: `cmd /c <editor> "<path>"`)。`\\wsl.localhost\...`・`\\wsl$\...` → WSL内パス+ディストリ名へ変換。`WslDistro` が未設定のWSLエントリは `wsl` から既定ディストリ名を取得して補う
@@ -62,3 +62,6 @@ dotnet run --project tests  # テスト(終了コード=失敗数)
 - `LauncherDialog` の高さは表示時(`ResetAndShow`)に `_config.Entries.Count` を基に `ResizeToFit()` で決める。フィルタ変更ごとにはリサイズしない(ちらつき防止)。
 - WSL 既定ディストリ名の取得(`Launcher.GetDefaultWslDistro`)は `wsl` を同期実行する。タイムアウト3秒、結果はプロセス内にキャッシュ。UI スレッドを最大3秒ブロックし得る点に注意(非同期化は `.docs/refactor/proposals.md` P2)。
 - `WindowX`/`WindowY` は settings.json に残るが、モーダル移行後は使用しない(後方互換維持のため削除しない)。
+- DPI: LauncherDialog は AutoScaleMode.None とし、DeviceDpi / 96 で外枠・検索欄・ボタン・行高・列幅・描画余白を一括再計算する。表示先画面を先に確定し、OnDpiChanged の既定処理完了後にも再配置する。固定pxへの上書きや自動スケーリングの併用は禁止。
+- DPI回帰検証: `dotnet run --project tests -- --display`。設定を読み書きしない透明フォームで接続画面を往復し、行高・列幅・外枠との整合と画面内への収まりを確認する。
+
