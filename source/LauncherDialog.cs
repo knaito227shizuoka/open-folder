@@ -7,7 +7,8 @@ namespace OpenFolder;
 public class LauncherDialog : Form
 {
     // ---- レイアウト定数(論理 px / 96 DPI 基準) ----
-    private const int L_Width   = 640;
+    private const int L_Width   = 900;  // 1列445px × 2列 + 外枠
+    private const int L_Columns = 2;
     private const int L_TopBar  = 64;   // 検索行の高さ(余白込み)
     private const int L_Sep     = 1;    // セパレータ
     private const int L_RowH    = 32;   // 候補行の高さ
@@ -119,6 +120,8 @@ public class LauncherDialog : Form
             TabStop             = false,
             IntegralHeight      = false,
             HorizontalScrollbar = false,
+            MultiColumn         = true,
+            ColumnWidth         = (L_Width - 10) / L_Columns,
             Location            = new Point(5, L_TopBar + L_Sep),
         };
 
@@ -212,8 +215,13 @@ public class LauncherDialog : Form
 
     private void ResizeToFit()
     {
-        var rows  = Math.Max(L_MinRows, Math.Min(L_MaxRows, _config.Entries.Count));
-        var listH = rows * L_RowH;
+        var work = Screen.FromPoint(Cursor.Position).WorkingArea;
+        var maxRows = Math.Max(1, Math.Min(L_MaxRows,
+            (work.Height - L_TopBar - L_Sep - 5 - 24 - SystemInformation.HorizontalScrollBarHeight) / _list.ItemHeight));
+        var rows = Math.Min(maxRows, Math.Max(L_MinRows,
+            (_config.Entries.Count + L_Columns - 1) / L_Columns));
+        // MultiColumn は上から下、次に右列へ並ぶ。あふれた列は横スクロール。
+        var listH = rows * _list.ItemHeight + SystemInformation.HorizontalScrollBarHeight;
         _list.Size = new Size(L_Width - 10, listH);  // 左右 5px を枠に開ける
         ClientSize = new Size(L_Width, L_TopBar + L_Sep + listH + 5);  // 下 5px を枠に開ける
     }
@@ -262,11 +270,12 @@ public class LauncherDialog : Form
     private void ScrollIntoView(int index)
     {
         if (index < 0 || index >= _list.Items.Count) return;
-        var visible = _list.ClientSize.Height / Math.Max(1, _list.ItemHeight);
+        var rows = Math.Max(1, _list.ClientSize.Height / Math.Max(1, _list.ItemHeight));
+        var visible = rows * L_Columns;
         if (index < _list.TopIndex)
-            _list.TopIndex = index;
+            _list.TopIndex = index / rows * rows;
         else if (index >= _list.TopIndex + visible)
-            _list.TopIndex = Math.Max(0, index - visible + 1);
+            _list.TopIndex = Math.Max(0, (index / rows - L_Columns + 1) * rows);
     }
 
     private void OpenSelected()
@@ -339,7 +348,10 @@ public class LauncherDialog : Form
 
         var textX    = chipX + 8;
         var textRect = new Rectangle(textX, e.Bounds.Y, chipRect.Right - textX - 4, e.Bounds.Height);
+        var state = g.Save();
+        g.SetClip(textRect, System.Drawing.Drawing2D.CombineMode.Intersect);
         DrawHighlightedText(g, entry.Name, _queryBox.Text.Trim(), Font, _boldFont, baseTextColor, matchColor, textRect);
+        g.Restore(state);
     }
 
     private static void DrawHighlightedText(
@@ -348,7 +360,7 @@ public class LauncherDialog : Form
         Color normalColor, Color matchColor, Rectangle rect)
     {
         const TextFormatFlags flags = TextFormatFlags.VerticalCenter
-            | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+            | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.PreserveGraphicsClipping;
 
         var matchIndex = string.IsNullOrEmpty(query)
             ? -1
