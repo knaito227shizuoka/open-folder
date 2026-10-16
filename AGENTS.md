@@ -65,3 +65,5 @@ dotnet run --project tests  # テスト(終了コード=失敗数)
 - DPI: LauncherDialog は AutoScaleMode.None とし、DeviceDpi / 96 で外枠・検索欄・ボタン・行高・列幅・描画余白を一括再計算する。表示先画面を先に確定し、OnDpiChanged の既定処理完了後にも再配置する。固定pxへの上書きや自動スケーリングの併用は禁止。
 - DPI回帰検証: `dotnet run --project tests -- --display`。設定を読み書きしない透明フォームで接続画面を往復し、行高・列幅・外枠との整合と画面内への収まりを確認する。
 
+- 候補の右クリックメニューは各ListBoxのContextMenuStrip。Openingで対象PathEntryを固定し、編集はManageDialogと同じEntryDialog(entry)、削除は確認後に登録のみ削除、新規追加は既存OnAddClickを呼ぶ。空白では編集・削除を無効化。変更確定後にSave・再配置・再検索する。
+- EntryDialog.Commit は引用符付き入力を受理し、UNC→WSL変換前にDirectoryForFileで最後の要素を親フォルダに補正する。判定は文字列のみ: 最後の要素にドットを含めばファイルとみなす（ドット付きフォルダは仕様上考慮外。`/`・`\` 両対応、ルート直下はルートを残す）。名前プレビュー・名前も補正後のパスから生成。

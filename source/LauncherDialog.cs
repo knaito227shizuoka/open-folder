@@ -167,7 +167,57 @@ public class LauncherDialog : Form
         list.MouseClick += OnListMouseClick;
         list.MouseMove += OnListMouseMove;
         list.KeyDown += OnQueryKeyDown;
+        list.ContextMenuStrip = BuildEntryMenu(list);
         return list;
+    }
+
+    private ContextMenuStrip BuildEntryMenu(ListBox list)
+    {
+        var menu = new ContextMenuStrip();
+        PathEntry? target = null;
+        var edit = menu.Items.Add("編集", null, (_, _) =>
+        {
+            if (target != null) EditEntry(target);
+        });
+        var remove = menu.Items.Add("削除", null, (_, _) =>
+        {
+            if (target != null) RemoveEntry(target);
+        });
+        menu.Items.Add("新規追加", null, OnAddClick);
+        menu.Opening += (_, _) =>
+        {
+            var index = list.IndexFromPoint(list.PointToClient(Cursor.Position));
+            target = index >= 0 ? (PathEntry)list.Items[index] : null;
+            edit.Enabled = remove.Enabled = target != null;
+            if (target != null) SelectIndex(_filteredEntries.IndexOf(target));
+        };
+        return menu;
+    }
+
+    private void EditEntry(PathEntry entry)
+    {
+        using var dialog = new EntryDialog(entry);
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _config.Save();
+            ResizeToFit();
+            ApplyFilter();
+            SelectIndex(_filteredEntries.IndexOf(entry));
+        }
+        Show(); Activate(); _queryBox.Focus();
+    }
+
+    private void RemoveEntry(PathEntry entry)
+    {
+        if (MessageBox.Show(this, $"「{entry.Name}」を削除しますか?", "open-folder",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+        {
+            _config.Entries.Remove(entry);
+            _config.Save();
+            ResizeToFit();
+            ApplyFilter();
+        }
+        Show(); Activate(); _queryBox.Focus();
     }
 
     private Button MakeButton(string text, int x, int y, int w, int h, int tabIndex)
@@ -263,18 +313,19 @@ public class LauncherDialog : Form
         var work = _workArea;
         var width = Math.Min(Px(L_Width), work.Width - Px(24));
         var inset = Px(5);
+        var bottomPadding = Px(18);
         var top = Px(L_TopBar);
         var sep = Px(L_Sep);
 
         _windowsList.ItemHeight = _wslList.ItemHeight = Px(L_RowH);
         var maxRows = Math.Max(1, Math.Min(L_MaxRows,
-            (work.Height - top - sep - inset - Px(24)) / _list.ItemHeight));
+            (work.Height - top - sep - bottomPadding - Px(24)) / _list.ItemHeight));
         var rows = Math.Min(maxRows, Math.Max(L_MinRows,
             Math.Max(_config.Entries.Count(e => !e.IsWsl), _config.Entries.Count(e => e.IsWsl))));
         // 環境ごとに列を固定し、各列で縦スクロールする。
         var listH = rows * _list.ItemHeight;
         SuspendLayout();
-        ClientSize = new Size(width, top + sep + listH + inset);
+        ClientSize = new Size(width, top + sep + listH + bottomPadding);
         var columnWidth = (width - inset * 2) / L_Columns;
         _windowsList.SetBounds(inset, top + sep, columnWidth, listH);
         _wslList.SetBounds(inset + columnWidth, top + sep, width - inset * 2 - columnWidth, listH);
@@ -363,7 +414,12 @@ public class LauncherDialog : Form
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _boldFont.Dispose();
+        if (disposing)
+        {
+            _boldFont.Dispose();
+            _windowsList.ContextMenuStrip?.Dispose();
+            _wslList.ContextMenuStrip?.Dispose();
+        }
         base.Dispose(disposing);
     }
 

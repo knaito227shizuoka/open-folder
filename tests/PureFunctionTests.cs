@@ -29,10 +29,24 @@ internal static class Program
         NormalizeChipTheme_Cases();
         QuoteCmdArgument_Cases();
         EntrySearch_Cases();
+        DirectoryForFile_Cases();
 
         Console.WriteLine();
         Console.WriteLine($"結果: {_passed} passed, {_failed} failed");
         return _failed;
+    }
+
+    private static void DirectoryForFile_Cases()
+    {
+        Eq("/home/hoge/huga", EntryDialog.DirectoryForFile("/home/hoge/huga/index.html"));
+        Eq("/home/hoge/huga", EntryDialog.DirectoryForFile("/home/hoge/huga"));
+        Eq("/home/hoge/huga/", EntryDialog.DirectoryForFile("/home/hoge/huga/"));
+        Eq("/", EntryDialog.DirectoryForFile("/index.html"));
+        Eq(@"C:\work\proj", EntryDialog.DirectoryForFile(@"C:\work\proj\README.md"));
+        Eq(@"C:\work\proj", EntryDialog.DirectoryForFile(@"C:\work\proj"));
+        Eq(@"C:\", EntryDialog.DirectoryForFile(@"C:\a.txt"));
+        Eq(@"\\wsl.localhost\Ubuntu\home\hoge", EntryDialog.DirectoryForFile(@"\\wsl.localhost\Ubuntu\home\hoge\a.js"));
+        Eq("LICENSE", EntryDialog.DirectoryForFile("LICENSE"));
     }
 
     private static void DisplayLayout_Cases()
@@ -65,7 +79,7 @@ internal static class Program
             EqInt(1, right.Items.Cast<PathEntry>().All(e => e.IsWsl) ? 1 : 0);
             EqInt(list.Right, right.Left);
             EqInt(dialog.ClientSize.Width, right.Right + list.Left);
-            EqInt(dialog.ClientSize.Height, list.Bottom + list.Left);
+            EqInt(dialog.ClientSize.Height, list.Bottom + (int)Math.Round(18 * dpi / 96.0));
             EqInt(1, screen.WorkingArea.Contains(dialog.Bounds) ? 1 : 0);
         }
         var query = dialog.Controls.OfType<Panel>().Single().Controls.OfType<TextBox>().Single();

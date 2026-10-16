@@ -97,7 +97,7 @@ public class EntryDialog : Form
     /// <summary>WSL自動判定と名前プレビューの更新。</summary>
     private void UpdatePreview()
     {
-        var path = _pathBox.Text.Trim();
+        var path = DirectoryForFile(_pathBox.Text.Trim().Trim('"'));
         if (path.StartsWith("/"))
             _wslCheck.Checked = true;
         else if (path.Length >= 2 && path[1] == ':')
@@ -122,13 +122,15 @@ public class EntryDialog : Form
 
     private bool Commit()
     {
-        var path = _pathBox.Text.Trim();
+        var path = _pathBox.Text.Trim().Trim('"');
         if (path.Length == 0)
         {
             MessageBox.Show(this, "パスを入力してください。", "open-folder");
             return false;
         }
 
+        // 最後の要素がファイル(ドットを含む)なら親フォルダへ補正。
+        path = DirectoryForFile(path);
         string? wslDistro = null;
         if (Launcher.TryConvertUncWslPath(path, out var wslPath, out var detectedDistro))
         {
@@ -143,5 +145,19 @@ public class EntryDialog : Form
         Entry.Name = PathEntry.GenerateName(path, Entry.IsWsl);
         Entry.ChipTheme = _themeButtons.FirstOrDefault(b => b.Checked)?.Tag as string ?? "DarkBlack";
         return true;
+    }
+
+    internal static string DirectoryForFile(string path)
+    {
+        // 最後の要素にドットがあればファイルとみなす(ドット付きフォルダは考慮外)。
+        // WSL表記(/)とWindows表記(\)の両方を扱うため文字列だけで判定する。
+        var sep = path.LastIndexOfAny(new[] { '/', '\\' });
+        if (sep < 0 || sep == path.Length - 1 || !path[(sep + 1)..].Contains('.'))
+            return path;
+        var parent = path[..sep];
+        // ルート直下(/index.html, C:\index.html)はルートを残す。
+        if (parent.Length == 0 || (parent.Length == 2 && parent[1] == ':'))
+            parent += path[sep];
+        return parent;
     }
 }
