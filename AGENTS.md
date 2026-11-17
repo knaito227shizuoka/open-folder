@@ -50,6 +50,7 @@ dotnet run --project tests  # テスト(終了コード=失敗数)
   - `ChipThemes.cs` : テーマ名 → 色の解決(`NormalizeChipTheme` / `GetChipColor` / `GetFontColorForBackground`)。旧エイリアス受理を含む。描画層専用で設定モデルからは分離
   - `AppConfig.cs` : 設定の読み書きと `PathEntry` モデル(保存先: `%APPDATA%\open-folder\settings.json`)。読めない設定は `settings.json.bak` へ退避してから初期化する
   - `EntryDialog.cs` : パス追加・編集ダイアログ(`/`始まりはWSL自動判定。名前は `{環境} : {親フォルダ} - {フォルダ名}` 形式で自動生成 — 例 `WSL : github - hoge`, `C : github - huga`)
+    - 背景色は 5色×2段(暗: 黒/青/赤/緑/黄、明: 白/青/赤/緑/黄)。ラジオボタンではなく内部クラス `ThemeButton`(色見本+色名を枠で囲んだ自前描画Control)で、選択中は赤い太枠。クリック/Spaceで選択
   - `ManageDialog.cs` : パス一覧の管理(追加・編集・削除)ダイアログ
 - `tests` : 純粋関数の characterization テスト(依存パッケージゼロの自前ランナー)。`dotnet run --project tests` で実行、終了コード=失敗数
 - `open-folder.csproj` : net6.0-windows / WinForms(SDKは6.0.300のみインストール済み)。`tests/**` は暗黙globから除外し、`OpenFolder.Tests` への `InternalsVisibleTo` を付与

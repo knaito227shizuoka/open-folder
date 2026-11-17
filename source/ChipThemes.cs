@@ -19,6 +19,7 @@ public static class ChipThemes
             "DARKBLUE" => "DarkBlue",
             "DARKRED" => "DarkRed",
             "DARKGREEN" => "DarkGreen",
+            "DARKYELLOW" => "DarkYellow",
             "LIGHT" or "LIGHT1" or "LIGHTWHITE" => "LightWhite",
             "LIGHT2" => "LightBlue",
             "LIGHT3" => "LightRed",
@@ -26,6 +27,7 @@ public static class ChipThemes
             "LIGHTBLUE" => "LightBlue",
             "LIGHTRED" => "LightRed",
             "LIGHTGREEN" => "LightGreen",
+            "LIGHTYELLOW" => "LightYellow",
             _ => "DarkBlack",
         };
     }
@@ -38,10 +40,12 @@ public static class ChipThemes
             "DarkBlue" => Color.FromArgb(34, 59, 96),
             "DarkRed" => Color.FromArgb(93, 42, 50),
             "DarkGreen" => Color.FromArgb(43, 78, 58),
+            "DarkYellow" => Color.FromArgb(102, 86, 28),
             "LightWhite" => Color.FromArgb(244, 246, 250),
             "LightBlue" => Color.FromArgb(218, 232, 252),
             "LightRed" => Color.FromArgb(252, 224, 226),
             "LightGreen" => Color.FromArgb(221, 241, 226),
+            "LightYellow" => Color.FromArgb(252, 244, 204),
             _ => Color.FromArgb(40, 44, 60),
         };
     }

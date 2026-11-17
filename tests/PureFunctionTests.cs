@@ -131,6 +131,8 @@ internal static class Program
         Eq("LightWhite", ChipThemes.NormalizeChipTheme("LIGHT"));
         Eq("LightBlue", ChipThemes.NormalizeChipTheme("LIGHT2"));
         Eq("DarkBlue", ChipThemes.NormalizeChipTheme("darkblue"));              // 小文字も通る
+        Eq("DarkYellow", ChipThemes.NormalizeChipTheme("DarkYellow"));
+        Eq("LightYellow", ChipThemes.NormalizeChipTheme("lightyellow"));
         Eq("DarkBlack", ChipThemes.NormalizeChipTheme("unknown-value"));        // 不明値はデフォルト
     }
 

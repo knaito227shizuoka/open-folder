@@ -6,7 +6,7 @@ public class EntryDialog : Form
     private readonly TextBox _pathBox = new();
     private readonly CheckBox _wslCheck = new();
     private readonly Label _namePreview = new();
-    private readonly List<RadioButton> _themeButtons = new();
+    private readonly List<ThemeButton> _themeButtons = new();
 
     public PathEntry Entry { get; }
 
@@ -40,15 +40,16 @@ public class EntryDialog : Form
         _namePreview.SetBounds(70, 75, 376, 23);
         _namePreview.ForeColor = SystemColors.GrayText;
 
-        var themeGroup = new GroupBox { Text = "背景色", Bounds = new Rectangle(70, 104, 376, 92) };
-        AddThemeButton(themeGroup, "DarkBlack", "黒", 12, 24);
-        AddThemeButton(themeGroup, "DarkBlue", "青", 102, 24);
-        AddThemeButton(themeGroup, "DarkRed", "赤", 192, 24);
-        AddThemeButton(themeGroup, "DarkGreen", "緑", 282, 24);
-        AddThemeButton(themeGroup, "LightWhite", "白", 12, 58);
-        AddThemeButton(themeGroup, "LightBlue", "青", 102, 58);
-        AddThemeButton(themeGroup, "LightRed", "赤", 192, 58);
-        AddThemeButton(themeGroup, "LightGreen", "緑", 282, 58);
+        var themeGroup = new GroupBox { Text = "背景色", Bounds = new Rectangle(70, 104, 376, 100) };
+        string[] darkThemes = { "DarkBlack", "DarkBlue", "DarkRed", "DarkGreen", "DarkYellow" };
+        string[] lightThemes = { "LightWhite", "LightBlue", "LightRed", "LightGreen", "LightYellow" };
+        string[] darkTexts = { "黒", "青", "赤", "緑", "黄" };
+        string[] lightTexts = { "白", "青", "赤", "緑", "黄" };
+        for (var i = 0; i < darkThemes.Length; i++)
+        {
+            AddThemeButton(themeGroup, darkThemes[i], darkTexts[i], 10 + i * 72, 22);
+            AddThemeButton(themeGroup, lightThemes[i], lightTexts[i], 10 + i * 72, 60);
+        }
         ApplyStyleSelection();
 
         var okButton = new Button { Text = "OK", DialogResult = DialogResult.OK, Bounds = new Rectangle(280, 220, 80, 28) };
@@ -70,21 +71,21 @@ public class EntryDialog : Form
 
     private void AddThemeButton(Control parent, string theme, string text, int x, int y)
     {
-        var color = ChipThemes.GetChipColor(theme);
-        var swatch = new Panel
-        {
-            BackColor = color,
-            BorderStyle = BorderStyle.FixedSingle,
-            Bounds = new Rectangle(x, y + 3, 16, 16),
-        };
-        var button = new RadioButton
+        var button = new ThemeButton(ChipThemes.GetChipColor(theme))
         {
             Text = text,
             Tag = theme,
-            Bounds = new Rectangle(x + 20, y, 56, 22),
+            Bounds = new Rectangle(x, y, 66, 32),
         };
+        button.Click += (_, _) => SelectTheme(button);
         _themeButtons.Add(button);
-        parent.Controls.AddRange(new Control[] { swatch, button });
+        parent.Controls.Add(button);
+    }
+
+    private void SelectTheme(ThemeButton selected)
+    {
+        foreach (var button in _themeButtons)
+            button.Checked = button == selected;
     }
 
     private void ApplyStyleSelection()
@@ -92,6 +93,69 @@ public class EntryDialog : Form
         var theme = ChipThemes.NormalizeChipTheme(Entry.ChipTheme);
         foreach (var button in _themeButtons)
             button.Checked = string.Equals((string?)button.Tag, theme, StringComparison.Ordinal);
+    }
+
+    /// <summary>色見本+色名を枠で囲んだ選択ボタン。選択中は赤い太枠で示す。</summary>
+    private sealed class ThemeButton : Control
+    {
+        private readonly Color _swatch;
+        private bool _checked;
+        private bool _hover;
+
+        public ThemeButton(Color swatch)
+        {
+            _swatch = swatch;
+            Cursor = Cursors.Hand;
+            TabStop = true;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint
+                | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw
+                | ControlStyles.Selectable, true);
+        }
+
+        public bool Checked
+        {
+            get => _checked;
+            set { if (_checked != value) { _checked = value; Invalidate(); } }
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { Focus(); base.OnMouseDown(e); }
+        protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+        protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Space) { OnClick(EventArgs.Empty); e.Handled = true; }
+            base.OnKeyDown(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(_hover ? SystemColors.ControlLight : SystemColors.Window);
+
+            var swatch = new Rectangle(8, (Height - 18) / 2, 18, 18);
+            using (var b = new SolidBrush(_swatch)) g.FillRectangle(b, swatch);
+            g.DrawRectangle(Pens.Gray, swatch);
+
+            var textRect = new Rectangle(swatch.Right + 4, 0, Width - swatch.Right - 8, Height);
+            TextRenderer.DrawText(g, Text, Font, textRect, ForeColor,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+
+            if (_checked)
+            {
+                using var pen = new Pen(Color.Red, 3);
+                g.DrawRectangle(pen, 1, 1, Width - 3, Height - 3);
+            }
+            else
+            {
+                g.DrawRectangle(SystemPens.ControlDark, 0, 0, Width - 1, Height - 1);
+            }
+
+            if (Focused && ShowFocusCues)
+                ControlPaint.DrawFocusRectangle(g, new Rectangle(4, 4, Width - 8, Height - 8));
+        }
     }
 
     /// <summary>WSL自動判定と名前プレビューの更新。</summary>
